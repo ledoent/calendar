@@ -4,7 +4,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 16.0\n"
+"Project-Id-Version: Odoo Server 17.0\n"
 "Report-Msgid-Bugs-To: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -670,14 +670,6 @@ msgid "It will disappear from your bookings list."
 msgstr ""
 
 #. module: resource_booking
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking____last_update
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_combination____last_update
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type____last_update
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type_combination_rel____last_update
-msgid "Last Modified on"
-msgstr ""
-
-#. module: resource_booking
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking__write_uid
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking_combination__write_uid
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type__write_uid
@@ -702,12 +694,6 @@ msgstr ""
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking__location
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type__location
 msgid "Location"
-msgstr ""
-
-#. module: resource_booking
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking__message_main_attachment_id
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type__message_main_attachment_id
-msgid "Main Attachment"
 msgstr ""
 
 #. module: resource_booking
@@ -1282,7 +1268,7 @@ msgstr ""
 
 #. module: resource_booking
 #: model:ir.ui.menu,name:resource_booking.menu_resource_calendar
-msgid "Working Times"
+msgid "Working Schedules"
 msgstr ""
 
 #. module: resource_booking
