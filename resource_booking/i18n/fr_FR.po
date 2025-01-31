@@ -699,14 +699,6 @@ msgid "It will disappear from your bookings list."
 msgstr "Il disparaîtra de votre liste de réservations."
 
 #. module: resource_booking
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking____last_update
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_combination____last_update
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type____last_update
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type_combination_rel____last_update
-msgid "Last Modified on"
-msgstr "Dernière modification le"
-
-#. module: resource_booking
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking__write_uid
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking_combination__write_uid
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type__write_uid
@@ -732,12 +724,6 @@ msgstr "Laissez vide pour générer automatiquement un nom de réservation."
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type__location
 msgid "Location"
 msgstr "Emplacement"
-
-#. module: resource_booking
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking__message_main_attachment_id
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type__message_main_attachment_id
-msgid "Main Attachment"
-msgstr "Pièce jointe principale"
 
 #. module: resource_booking
 #: model:res.groups,name:resource_booking.group_manager
@@ -1349,8 +1335,8 @@ msgstr ""
 
 #. module: resource_booking
 #: model:ir.ui.menu,name:resource_booking.menu_resource_calendar
-msgid "Working Times"
-msgstr "Temps de travail"
+msgid "Working Schedules"
+msgstr ""
 
 #. module: resource_booking
 #: model_terms:ir.ui.view,arch_db:resource_booking.scheduling_calendar
@@ -1376,3 +1362,12 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:resource_booking.message_combination_assigned
 msgid "because you belong to the chosen resource combination:"
 msgstr ""
+
+#~ msgid "Last Modified on"
+#~ msgstr "Dernière modification le"
+
+#~ msgid "Main Attachment"
+#~ msgstr "Pièce jointe principale"
+
+#~ msgid "Working Times"
+#~ msgstr "Temps de travail"

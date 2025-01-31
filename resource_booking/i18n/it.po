@@ -707,14 +707,6 @@ msgid "It will disappear from your bookings list."
 msgstr "Scomparirà dalla lista prenotazioni."
 
 #. module: resource_booking
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking____last_update
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_combination____last_update
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type____last_update
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type_combination_rel____last_update
-msgid "Last Modified on"
-msgstr "Ultima modifica il"
-
-#. module: resource_booking
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking__write_uid
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking_combination__write_uid
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type__write_uid
@@ -740,12 +732,6 @@ msgstr "Lasciare vuoto per generare automaticamente un nome prenotazione."
 #: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type__location
 msgid "Location"
 msgstr "Ubicazione"
-
-#. module: resource_booking
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking__message_main_attachment_id
-#: model:ir.model.fields,field_description:resource_booking.field_resource_booking_type__message_main_attachment_id
-msgid "Main Attachment"
-msgstr "Allegato principale"
 
 #. module: resource_booking
 #: model:res.groups,name:resource_booking.group_manager
@@ -1353,8 +1339,8 @@ msgstr "Chi parteciperà a questa prenotazione?"
 
 #. module: resource_booking
 #: model:ir.ui.menu,name:resource_booking.menu_resource_calendar
-msgid "Working Times"
-msgstr "Orari lavorativi"
+msgid "Working Schedules"
+msgstr ""
 
 #. module: resource_booking
 #: model_terms:ir.ui.view,arch_db:resource_booking.scheduling_calendar
@@ -1380,3 +1366,12 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:resource_booking.message_combination_assigned
 msgid "because you belong to the chosen resource combination:"
 msgstr "perché appartiene alla combinazione risorsa scelta:"
+
+#~ msgid "Last Modified on"
+#~ msgstr "Ultima modifica il"
+
+#~ msgid "Main Attachment"
+#~ msgstr "Allegato principale"
+
+#~ msgid "Working Times"
+#~ msgstr "Orari lavorativi"
