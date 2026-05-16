@@ -10,3 +10,174 @@
 .resource_booking_portal_schedule {
     overflow: initial;
 }
+
+// Portal booking detail page
+$rb-radius: 0.75rem;
+$rb-radius-sm: 0.5rem;
+
+.o_rb_portal_page {
+    .o_rb_portal_shell {
+        border: 1px solid var(--o-gray-200, #e9ecef);
+        border-radius: $rb-radius;
+        background: var(--body-bg, #fff);
+        overflow: hidden;
+        box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.04);
+    }
+}
+
+.o_rb_portal_header {
+    position: relative;
+    overflow: hidden;
+    padding: 1.5rem;
+    background: var(--o-gray-100, #f8f9fa);
+    border-bottom: 1px solid var(--o-gray-200, #e9ecef);
+
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+            90deg,
+            var(--o-gray-100, #f8f9fa) 0%,
+            color-mix(in srgb, var(--o-gray-100, #f8f9fa) 90%, transparent) 42%,
+            color-mix(in srgb, var(--o-gray-100, #f8f9fa) 58%, transparent) 100%
+        );
+        pointer-events: none;
+    }
+}
+
+.o_rb_portal_header_content {
+    position: relative;
+    z-index: 2;
+}
+
+.o_rb_portal_header_image {
+    position: absolute;
+    top: 50%;
+    right: -1.5rem;
+    width: 30rem;
+    max-width: 68%;
+    height: 140%;
+    object-fit: cover;
+    opacity: 0.52;
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 1;
+    mask-image: linear-gradient(to left, #000 50%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to left, #000 50%, transparent 100%);
+}
+
+.o_rb_portal_eyebrow,
+.o_rb_detail_label {
+    color: var(--o-gray-500, #adb5bd);
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.o_rb_portal_title {
+    color: var(--o-body-color, #212529);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.o_rb_portal_subtitle {
+    color: var(--o-gray-600, #6c757d);
+}
+
+.o_rb_status_pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.42rem 0.95rem;
+    border: 1px solid rgba(25, 135, 84, 0.28);
+    border-radius: 2rem;
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+    font-size: 0.82rem;
+    font-weight: 700;
+
+    &.o_rb_status_confirmed {
+        background: color-mix(in srgb, var(--body-bg, #fff) 88%, transparent);
+        color: var(--bs-success, #198754);
+    }
+
+    &.o_rb_status_default {
+        background: var(--o-gray-200, #e9ecef);
+        color: var(--o-gray-700, #495057);
+    }
+}
+
+.o_rb_detail_card {
+    padding: 1.5rem;
+}
+
+.o_rb_detail_section {
+    height: 100%;
+    padding: 0.25rem 1.25rem 0.25rem 0;
+
+    &.o_rb_detail_section_border {
+        border-left: 1px solid var(--o-gray-200, #e9ecef);
+        padding-right: 0;
+        padding-left: 1.5rem;
+    }
+}
+
+.o_rb_section_title {
+    margin-bottom: 1rem;
+    color: var(--o-gray-700, #495057);
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.o_rb_detail_row {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+
+    &:not(:last-child) {
+        border-bottom: 1px solid var(--o-gray-200, #e9ecef);
+    }
+
+    > i {
+        width: 1.25rem;
+        color: var(--o-gray-500, #adb5bd);
+        padding-top: 0.2rem;
+        text-align: center;
+    }
+}
+
+.o_rb_detail_value {
+    color: var(--o-body-color, #212529);
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.o_rb_inline_token {
+    display: inline-flex;
+    margin: 0.25rem 0.35rem 0.25rem 0;
+    padding: 0.3rem 0.65rem;
+    border-radius: $rb-radius-sm;
+    background: var(--o-gray-100, #f8f9fa);
+    color: var(--o-gray-700, #495057);
+    font-size: 0.88rem;
+}
+
+.o_rb_overdue_alert {
+    border-radius: $rb-radius-sm;
+}
+
+@media (max-width: 991.98px) {
+    .o_rb_detail_section {
+        padding-right: 0;
+
+        &.o_rb_detail_section_border {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            padding-left: 0;
+            border-top: 1px solid var(--o-gray-200, #e9ecef);
+            border-left: 0;
+        }
+    }
+}

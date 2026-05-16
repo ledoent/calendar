@@ -3,6 +3,7 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from datetime import datetime
+from unittest.mock import patch
 
 from freezegun import freeze_time
 from lxml.html import fromstring
@@ -23,6 +24,12 @@ class PortalCase(HttpCase):
 
         cls.user_portal = new_test_user(
             cls.env, login="ptl", password="ptl", groups="base.group_portal"
+        )
+        cls.user_no_booking_access = new_test_user(
+            cls.env,
+            login="no_booking_access",
+            password="no_booking_access",
+            groups="base.group_user",
         )
         cls.user_manager = new_test_user(
             cls.env,
@@ -48,6 +55,58 @@ class PortalCase(HttpCase):
             }
         )
         self.start_tour("/", "resource_booking_ptl2_tour", login="ptl")
+
+    def test_portal_home_booking_counter_without_booking_access(self):
+        self.authenticate("no_booking_access", "no_booking_access")
+
+        portal_home = self.url_open("/my")
+        self.assertEqual(portal_home.status_code, 200)
+        self.assertNotIn(b"You are not allowed", portal_home.content)
+
+        counters = self.make_jsonrpc_request(
+            "/my/counters", {"counters": ["booking_count"]}
+        )
+        self.assertEqual(counters["booking_count"], 0)
+
+        bookings_page = self.url_open("/my/bookings")
+        self.assertEqual(bookings_page.status_code, 200)
+        self.assertIn(b"There are currently no bookings", bookings_page.content)
+
+    def test_portal_home_booking_counter_with_booking_access(self):
+        self.env["resource.booking"].create(
+            {
+                "partner_ids": [(4, self.user_portal.partner_id.id)],
+                "type_id": self.rbt.id,
+            }
+        )
+        self.authenticate("ptl", "ptl")
+
+        counters = self.make_jsonrpc_request(
+            "/my/counters", {"counters": ["booking_count"]}
+        )
+        self.assertEqual(counters["booking_count"], 1)
+
+    def test_portal_list_token_generation_does_not_sync_meeting(self):
+        booking = self.env["resource.booking"].create(
+            {
+                "partner_ids": [(4, self.user_portal.partner_id.id)],
+                "type_id": self.rbt.id,
+                "combination_id": self.rbcs[0].id,
+                "start": datetime(2021, 3, 1, 8),
+            }
+        )
+        self.assertTrue(booking.meeting_id)
+        booking.access_token = False
+
+        with patch.object(
+            type(booking),
+            "_sync_meeting",
+            side_effect=AssertionError("access_token write should not sync meeting"),
+        ):
+            portal_url = booking.get_portal_url()
+
+        self.assertTrue(booking.access_token)
+        self.assertIn("access_token=", portal_url)
 
     def test_portal_scheduling_conflict(self):
         """Produce a scheduling conflict and see how UI behaves.
@@ -186,7 +245,7 @@ class PortalCase(HttpCase):
         self.assertTrue(
             public_page.cssselect(
                 'div:contains("Dates:")'
-                ':contains("03/01/2021 at (10:00:00 To 10:30:00) (UTC)")'
+                ':contains("03/01/2021 at (10:00:00 AM To 10:30:00 AM) (UTC)")'
             )
         )
         # Public guy's booking and related meeting are OK in backend
@@ -252,7 +311,7 @@ class PortalCase(HttpCase):
         self.assertTrue(
             portal_page.cssselect(
                 'div:contains("Dates:")'
-                ':contains("03/01/2021 at (10:30:00 To 11:30:00) (UTC)")'
+                ':contains("03/01/2021 at (10:30:00 AM To 11:30:00 AM) (UTC)")'
             )
         )
         # Portal guy cancels

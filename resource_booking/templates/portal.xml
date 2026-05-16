@@ -269,6 +269,7 @@
                     t-value="'/resource_booking/static/src/img/portal_icon.svg'"
                 />
                 <t t-set="title">Bookings</t>
+                <t t-set="text">Review and manage your bookings</t>
                 <t t-set="url" t-value="'/my/bookings'" />
                 <t t-set="placeholder_count" t-value="'booking_count'" />
             </t>
@@ -326,22 +327,30 @@
         </t>
     </template>
     <template id="resource_booking_portal_header" name="Resource Booking Header">
-        <div class="row justify-content-between mb-3">
-            <div class="col-12 col-md-9">
-                <div class="d-flex gap-2">
-                    <h3 class="my-0">
-                        Booking
+        <div class="o_rb_portal_header mb-4">
+            <img
+                t-if="'website_card_image' in booking_sudo.type_id._fields and booking_sudo.type_id.website_card_image"
+                t-att-src="'/web/image/resource.booking.type/%s/website_card_image' % booking_sudo.type_id.id"
+                t-att-alt="booking_sudo.type_id.name"
+                class="o_rb_portal_header_image"
+            />
+            <div class="o_rb_portal_header_content d-flex flex-column flex-md-row justify-content-between gap-3">
+                <div>
+                    <div class="o_rb_portal_eyebrow mb-2">Booking details</div>
+                    <h2 class="o_rb_portal_title my-0">
                         <span t-field="booking_sudo.display_name" />
-                    </h3>
+                    </h2>
+                    <div class="o_rb_portal_subtitle mt-2">
+                        <span t-field="booking_sudo.type_id.name" />
+                    </div>
                 </div>
-            </div>
-            <div class="col-auto">
-                <small class="text-end">Stage:</small>
-                <span
-                    t-attf-class="badge rounded-pill #{'text-bg-success' if booking_sudo.state == 'confirmed' else 'text-bg-info'}"
-                    t-field="booking_sudo.state"
-                    title="Current state of this booking"
-                />
+                <div class="d-flex align-items-start justify-content-md-end">
+                    <span
+                        t-attf-class="o_rb_status_pill #{'o_rb_status_confirmed' if booking_sudo.state == 'confirmed' else 'o_rb_status_default'}"
+                        t-field="booking_sudo.state"
+                        title="Current state of this booking"
+                    />
+                </div>
             </div>
         </div>
     </template>
@@ -356,79 +365,108 @@
                 </t>
             </t>
             <!-- Form -->
-            <div id="booking_content" class="o_portal_content col-12">
-                <div id="card">
+            <div id="booking_content" class="o_portal_content col-12 o_rb_portal_page">
+                <div class="o_rb_portal_shell">
                     <div id="card_header" data-anchor="true">
                         <t t-call="resource_booking.resource_booking_portal_header" />
                     </div>
-                    <div id="card_body" class="row">
-                        <div class="col-md">
-                            <div class="mb-1">
-                                <strong>Type:</strong>
-                                <span t-field="booking_sudo.type_id.name" />
+                    <div id="card_body" class="o_rb_detail_card">
+                        <div class="row g-0">
+                            <div class="col-lg-6">
+                                <div class="o_rb_detail_section">
+                                    <h3 class="o_rb_section_title">Booking summary</h3>
+                                    <div class="o_rb_detail_row">
+                                        <i class="fa fa-calendar-check-o" aria-hidden="true" />
+                                        <div>
+                                            <div class="o_rb_detail_label">Date and time</div>
+                                            <div class="o_rb_detail_value">
+                                                <t t-out="booking_sudo._get_portal_start_display()" />
+                                                <span class="text-muted ms-1">
+                                                    (<t t-out="booking_sudo._get_portal_timezone_label()" />)
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="o_rb_detail_row">
+                                        <i class="fa fa-clock-o" aria-hidden="true" />
+                                        <div>
+                                            <div class="o_rb_detail_label">Duration</div>
+                                            <div class="o_rb_detail_value">
+                                                <t t-out="booking_sudo._get_portal_duration_display()" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div t-if="booking_sudo.location" class="o_rb_detail_row">
+                                        <i class="fa fa-map-marker" aria-hidden="true" />
+                                        <div>
+                                            <div class="o_rb_detail_label">Location</div>
+                                            <div class="o_rb_detail_value">
+                                                <span t-field="booking_sudo.location" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div t-if="booking_sudo.videocall_location" class="o_rb_detail_row">
+                                        <i class="fa fa-video-camera" aria-hidden="true" />
+                                        <div>
+                                            <div class="o_rb_detail_label">Meeting link</div>
+                                            <div class="o_rb_detail_value">
+                                                <a
+                                                    t-att-href="booking_sudo.videocall_location"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <t t-out="booking_sudo.videocall_location" />
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="mb-1">
-                                <strong>Requested by:</strong>
-                                <ul>
-                                    <t
-                                        t-foreach="booking_sudo.partner_ids"
-                                        t-as="partner"
+                            <div class="col-lg-6">
+                                <div class="o_rb_detail_section o_rb_detail_section_border">
+                                    <h3 class="o_rb_section_title">People and resources</h3>
+                                    <div class="o_rb_detail_row">
+                                        <i class="fa fa-user-o" aria-hidden="true" />
+                                        <div>
+                                            <div class="o_rb_detail_label">Requested by</div>
+                                            <div class="o_rb_detail_value">
+                                                <t t-foreach="booking_sudo.partner_ids" t-as="partner">
+                                                    <span class="o_rb_inline_token" t-field="partner.display_name" />
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="o_rb_detail_row">
+                                        <i class="fa fa-cube" aria-hidden="true" />
+                                        <div>
+                                            <div class="o_rb_detail_label">Booked resources</div>
+                                            <div class="o_rb_detail_value">
+                                                <t
+                                                    t-foreach="booking_sudo.combination_id.resource_ids"
+                                                    t-as="resource"
+                                                >
+                                                    <span class="o_rb_inline_token" t-field="resource.name" />
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div t-if="booking_sudo.requester_advice" class="o_rb_detail_row">
+                                        <i class="fa fa-info-circle" aria-hidden="true" />
+                                        <div>
+                                            <div class="o_rb_detail_label">Advice</div>
+                                            <div class="o_rb_detail_value">
+                                                <span t-field="booking_sudo.requester_advice" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div
+                                        t-if="booking_sudo.is_overdue"
+                                        role="alert"
+                                        class="o_rb_overdue_alert alert alert-warning mb-0"
                                     >
-                                        <li>
-                                            <span t-field="partner.display_name" />
-                                        </li>
-                                    </t>
-                                </ul>
-                            </div>
-                            <div class="mb-1">
-                                <strong>Booked resources:</strong>
-                                <ul>
-                                    <t
-                                        t-foreach="booking_sudo.combination_id.resource_ids"
-                                        t-as="resource"
-                                    >
-                                        <li>
-                                            <span t-field="resource.name" />
-                                        </li>
-                                    </t>
-                                </ul>
-                            </div>
-                        </div>
-                        <div class="col-md">
-                            <div class="mb-1">
-                                <strong>Location:</strong>
-                                <span t-field="booking_sudo.location" />
-                            </div>
-                            <div class="mb-1">
-                                <strong>Meeting URL:</strong>
-                                <a
-                                    t-att-href="booking_sudo.videocall_location"
-                                    target="_blank"
-                                >
-                                    <t t-out="booking_sudo.videocall_location or ''" />
-                                </a>
-                            </div>
-                            <div class="mb-1">
-                                <strong>Dates:</strong>
-                                <span t-field="booking_sudo.meeting_id.display_time" />
-                            </div>
-                            <div class="mb-1">
-                                <strong>Duration:</strong>
-                                <span
-                                    t-field="booking_sudo.duration"
-                                    t-options='{"widget": "float_time"}'
-                                />
-                            </div>
-                            <div t-if="booking_sudo.requester_advice" class="mb-1">
-                                <strong>Advice:</strong>
-                                <span t-field="booking_sudo.requester_advice" />
-                            </div>
-                            <div
-                                t-if="booking_sudo.is_overdue"
-                                role="alert"
-                                class="mb-1 alert alert-warning"
-                            >
-                                This booking exceeded its modifications deadline.
+                                        This booking exceeded its modifications deadline.
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

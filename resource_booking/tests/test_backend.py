@@ -2,7 +2,7 @@
 # Copyright 2022 Tecnativa - Pedro M. Baeza
 # Copyright 2024 Tecnativa - Carolina Fernandez
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
 from dateutil.relativedelta import relativedelta
@@ -36,6 +36,19 @@ class BackendCaseBase(TransactionCase):
 
 @freeze_time("2021-02-26 09:00:00", tick=True)  # Last Friday of February
 class BackendCaseMisc(BackendCaseBase):
+    @users("plain")
+    def test_plain_user_calendar_event_form(self):
+        event_form = Form(
+            self.env["calendar.event"].with_context(
+                default_partner_ids=self.env.user.partner_id.ids,
+                default_start="2023-01-01 00:00:00",
+                default_stop="2023-01-01 01:00:00",
+            )
+        )
+        event_form.name = "Test calendar event"
+        event = event_form.save()
+        self.assertEqual(event.name, "Test calendar event")
+
     @users("plain")
     @mute_logger("odoo.models.unlink")
     def test_plain_user_calendar_event(self):
@@ -303,6 +316,104 @@ class BackendCaseMisc(BackendCaseBase):
         self.assertTrue(booking.meeting_id)
         self.assertEqual(booking.state, "scheduled")
 
+    def test_available_slots_respect_max_advance_booking_days(self):
+        self.rbt.write(
+            {
+                "max_advance_booking_days": 4,
+                "modifications_deadline": 0,
+                "resource_calendar_id": self.r_calendars[2].id,
+                "slot_duration": 0.5,
+            }
+        )
+        booking = self.env["resource.booking"].new(
+            {"type_id": self.rbt.id, "duration": self.rbt.duration}
+        )
+        now = fields.Datetime.context_timestamp(booking, fields.Datetime.now())
+        slots = booking._get_available_slots(now, now + timedelta(days=10))
+        max_start = now + timedelta(days=4)
+        self.assertTrue(slots)
+        self.assertTrue(
+            all(slot <= max_start for day_slots in slots.values() for slot in day_slots)
+        )
+        self.assertFalse(any(day > max_start.date() for day in slots))
+
+    def test_resource_buffer_blocks_shared_resource_following_slots(self):
+        self.rbt.write(
+            {
+                "combination_assignment": "sorted",
+                "duration": 1.0,
+                "modifications_deadline": 0,
+                "resource_calendar_id": self.r_calendars[0].id,
+                "slot_duration": 0.25,
+            }
+        )
+        self.r_users[0].booking_buffer = 0.5
+        shared_material = self.env["resource.resource"].create(
+            {
+                "name": "Shared-resource alternate material",
+                "calendar_id": self.r_calendars[0].id,
+                "resource_type": "material",
+                "tz": "UTC",
+            }
+        )
+        shared_user_combination = self.env["resource.booking.combination"].create(
+            {"resource_ids": [Command.set([self.r_users[0].id, shared_material.id])]}
+        )
+        other_type = self.env["resource.booking.type"].create(
+            {
+                "name": "Other booking option",
+                "combination_rel_ids": [
+                    Command.create({"sequence": 0, "combination_id": shared_user_combination.id})
+                ],
+                "duration": 1.0,
+                "modifications_deadline": 0,
+                "resource_calendar_id": self.r_calendars[0].id,
+                "slot_duration": 0.25,
+            }
+        )
+        self.env["resource.booking"].create(
+            {
+                "partner_ids": [(4, self.partner.id)],
+                "start": "2021-03-01 08:00:00",
+                "duration": 1.0,
+                "type_id": self.rbt.id,
+                "combination_id": self.rbcs[0].id,
+                "combination_auto_assign": False,
+            }
+        )
+        booking = self.env["resource.booking"].new(
+            {
+                "type_id": other_type.id,
+                "duration": 1.0,
+                "combination_id": shared_user_combination.id,
+                "combination_auto_assign": False,
+            }
+        )
+        slots = booking._get_available_slots(
+            utc.localize(datetime(2021, 3, 1)),
+            utc.localize(datetime(2021, 3, 2)),
+        )
+        monday_slots = slots[datetime(2021, 3, 1).date()]
+        self.assertNotIn(utc.localize(datetime(2021, 3, 1, 9)), monday_slots)
+        self.assertIn(utc.localize(datetime(2021, 3, 1, 9, 30)), monday_slots)
+
+        unrelated_booking = self.env["resource.booking"].new(
+            {
+                "type_id": self.rbt.id,
+                "duration": 1.0,
+                "combination_id": self.rbcs[2].id,
+                "combination_auto_assign": False,
+            }
+        )
+        unrelated_slots = unrelated_booking._get_available_slots(
+            utc.localize(datetime(2021, 3, 1)),
+            utc.localize(datetime(2021, 3, 2)),
+        )
+        self.assertIn(
+            utc.localize(datetime(2021, 3, 1, 9)),
+            unrelated_slots[datetime(2021, 3, 1).date()],
+        )
+
     def test_dates_inverse(self):
         """Start & stop fields are computed with inverse. Test their workflow."""
         # Set type to be available only on mondays
@@ -492,6 +603,30 @@ class BackendCaseMisc(BackendCaseBase):
         self.assertFalse(rb_f.combination_id)
         # Everyone's free at 9
         rb_f.start = datetime(2021, 3, 1, 9)
+        self.assertTrue(rb_f.combination_id)
+
+    def test_allday_event_blocks_whole_day(self):
+        """All-day events block the whole local day on 24h calendars."""
+        self.rbt.resource_calendar_id = self.r_calendars[3]
+        self.env["calendar.event"].create(
+            {
+                "name": "all day saturday",
+                "start": datetime(2021, 2, 27, 0),
+                "start_date": date(2021, 2, 27),
+                "stop": datetime(2021, 2, 27, 0),
+                "stop_date": date(2021, 2, 27),
+                "allday": True,
+                "partner_ids": [Command.set(self.users.partner_id.ids)],
+            }
+        )
+        rb_f = Form(self.env["resource.booking"])
+        rb_f.partner_ids.add(self.partner)
+        rb_f.type_id = self.rbt
+        rb_f.start = datetime(2021, 2, 27, 1)
+        self.assertFalse(rb_f.combination_id)
+        rb_f.start = datetime(2021, 2, 27, 19)
+        self.assertFalse(rb_f.combination_id)
+        rb_f.start = datetime(2021, 2, 28, 1)
         self.assertTrue(rb_f.combination_id)
 
     @mute_logger("odoo.models.unlink")
@@ -714,7 +849,7 @@ class BackendCaseMisc(BackendCaseBase):
         self.assertEqual(
             rb.display_name,
             "some customer - Test resource booking type "
-            "- 03/01/2021 at (08:00:00 To 08:30:00) (UTC)",
+            "- 03/01/2021 at (08:00:00 AM To 08:30:00 AM) (UTC)",
         )
         self.assertEqual(
             rb.with_context(using_portal=True).display_name, "# %d" % rb.id
