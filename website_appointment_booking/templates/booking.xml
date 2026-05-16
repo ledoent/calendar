@@ -2,6 +2,100 @@
 <!-- Copyright 2025 Ledo Enterprises LLC - Don Kendall
      License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl). -->
 <odoo>
+    <template id="booking_landing_page" name="Public Appointment Booking Landing Page">
+        <t t-call="website.layout">
+            <div id="wrap">
+                <div class="container o_wab_page o_wab_landing py-5">
+                    <div class="row mb-4">
+                        <div class="col-lg-10 mx-auto text-center">
+                            <h1 class="display-6 fw-bold mb-2">Book an appointment</h1>
+                            <p class="text-muted mb-0">Choose the appointment type that works best for you.</p>
+                        </div>
+                    </div>
+                    <div t-if="booking_types" class="row g-4">
+                        <t t-foreach="booking_types" t-as="booking_type">
+                            <div class="col-md-6 col-lg-3">
+                                <article class="card h-100 o_wab_booking_card">
+                                    <img
+                                        t-if="booking_type.website_card_image"
+                                        t-att-src="'/web/image/resource.booking.type/%s/website_card_image?width=400&amp;height=400' % booking_type.id"
+                                        t-att-alt="booking_type.name"
+                                        class="card-img-top o_wab_booking_card_img"
+                                    />
+                                    <div
+                                        t-else=""
+                                        class="o_wab_booking_card_placeholder card-img-top d-flex align-items-center justify-content-center"
+                                    >
+                                        <i class="fa fa-calendar-check-o" />
+                                    </div>
+                                    <div class="card-body d-flex flex-column">
+                                        <h2 class="h5 card-title mb-2" t-field="booking_type.name" />
+                                        <div
+                                            t-if="booking_type.website_description"
+                                            class="card-text text-muted small mb-3 o_wab_card_description"
+                                            t-field="booking_type.website_description"
+                                        />
+                                        <div class="o_wab_card_meta d-flex flex-column gap-1 mb-3">
+                                            <span class="o_wab_card_meta_item">
+                                                <i class="fa fa-clock-o" />
+                                                <t t-out="'%d min' % int(booking_type.duration * 60)" />
+                                            </span>
+                                            <span
+                                                t-if="booking_type.location"
+                                                class="o_wab_card_meta_item"
+                                            >
+                                                <i class="fa fa-map-marker" />
+                                                <t t-out="booking_type.location" />
+                                            </span>
+                                            <span
+                                                t-if="booking_type.require_upfront_payment"
+                                                class="o_wab_card_meta_item o_wab_payment_price"
+                                            >
+                                                <i class="fa fa-credit-card" />
+                                                <span>Upfront payment:</span>
+                                                <strong
+                                                    t-out="booking_type.website_payment_price"
+                                                    t-options="{'widget': 'monetary', 'display_currency': booking_type.currency_id}"
+                                                />
+                                            </span>
+                                        </div>
+                                        <div
+                                            t-if="booking_type.sudo().website_card_resource_ids"
+                                            class="o_wab_card_avatars d-flex align-items-center mb-3"
+                                        >
+                                            <t t-foreach="booking_type.sudo().website_card_resource_ids" t-as="avatar_resource">
+                                                <img
+                                                    t-att-src="avatar_resource.sudo().avatar_128 and image_data_uri(avatar_resource.sudo().avatar_128) or '/web/static/img/user_placeholder.jpg'"
+                                                    t-att-alt="avatar_resource.name"
+                                                    t-att-title="avatar_resource.name"
+                                                    class="o_wab_card_avatar rounded-circle"
+                                                />
+                                            </t>
+                                        </div>
+                                        <div class="mt-auto">
+                                            <a
+                                                t-attf-href="/book/#{booking_type.website_slug}"
+                                                class="btn btn-primary"
+                                            >Book now</a>
+                                        </div>
+                                    </div>
+                                </article>
+                            </div>
+                        </t>
+                    </div>
+                    <div t-else="" class="row">
+                        <div class="col-lg-8 mx-auto">
+                            <div class="o_wab_empty_month">
+                                <i class="fa fa-calendar-o d-block" />
+                                <p class="mb-0">No booking types are currently available.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
     <template id="booking_page" name="Public Appointment Booking">
         <t t-call="website.layout">
             <div id="wrap">
@@ -32,6 +126,17 @@
                                     >
                                         <i class="fa fa-map-marker" />
                                         <t t-out="booking_type.location" />
+                                    </span>
+                                    <span
+                                        t-if="booking_type.require_upfront_payment"
+                                        class="o_wab_meta_pill o_wab_payment_price"
+                                    >
+                                        <i class="fa fa-credit-card" />
+                                        <span>Upfront payment:</span>
+                                        <strong
+                                            t-out="booking_type.website_payment_price"
+                                            t-options="{'widget': 'monetary', 'display_currency': booking_type.currency_id}"
+                                        />
                                     </span>
                                 </div>
                             </div>
@@ -72,55 +177,84 @@
                                     t-value="start - relativedelta(months=1)"
                                 />
 
-                                <!-- No slots this month -->
-                                <t t-if="not slots">
-                                    <div class="o_wab_empty_month">
-                                        <i class="fa fa-calendar-o d-block" />
-                                        <p class="mb-2">
-                                            No available slots this month.
-                                        </p>
-                                        <a
-                                            t-attf-href="/book/#{booking_type.website_slug}/#{start_next.year}/#{start_next.month}"
-                                            class="btn btn-outline-primary btn-sm"
-                                        >
-                                            Try next month
-                                            <i class="fa fa-arrow-right ms-1" />
-                                        </a>
-                                    </div>
-                                </t>
-
                                 <!-- Calendar grid + Slots panel -->
-                                <t t-if="slots">
-                                    <div class="o_wab_cal_grid">
-                                        <!-- Left: Calendar -->
-                                        <div>
-                                            <!-- Month navigation -->
-                                            <div
-                                                class="o_wab_month_nav d-flex justify-content-between align-items-center mb-3"
-                                            >
-                                                <t t-if="start > now">
-                                                    <a
-                                                        t-attf-href="/book/#{booking_type.website_slug}/#{start_previous.year}/#{start_previous.month}"
-                                                        class="o_wab_nav_btn"
-                                                        aria-label="Previous month"
-                                                    >
-                                                        <i class="fa fa-chevron-left" />
-                                                    </a>
-                                                </t>
-                                                <span t-else="" style="width:2.2rem" />
-                                                <span
-                                                    class="o_wab_month_label"
-                                                    t-out="start.strftime('%B %Y')"
-                                                />
-                                                <a
-                                                    t-attf-href="/book/#{booking_type.website_slug}/#{start_next.year}/#{start_next.month}"
-                                                    class="o_wab_nav_btn"
-                                                    aria-label="Next month"
+                                <div class="o_wab_cal_grid">
+                                    <!-- Left: Calendar -->
+                                    <div>
+                                        <t t-if="slots and len(combination_options) &gt; 1">
+                                            <div class="o_wab_combination mb-3 text-center">
+                                                <div class="text-muted small mb-2">with</div>
+                                                <div
+                                                    class="d-flex flex-wrap justify-content-center gap-2"
+                                                    role="group"
+                                                    aria-label="With"
                                                 >
-                                                    <i class="fa fa-chevron-right" />
+                                                    <button
+                                                        type="button"
+                                                        t-attf-class="btn btn-outline-secondary btn-sm o_wab_combination_btn#{'' if selected_combination_id else ' active'}"
+                                                        data-combination-id=""
+                                                        t-att-aria-pressed="'false' if selected_combination_id else 'true'"
+                                                    >No preference</button>
+                                                    <t
+                                                        t-foreach="combination_options"
+                                                        t-as="combination_option"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            t-attf-class="btn btn-outline-secondary btn-sm o_wab_combination_btn#{' active' if combination_option['id'] == selected_combination_id else ''}"
+                                                            t-att-data-combination-id="combination_option['id']"
+                                                            t-att-aria-pressed="'true' if combination_option['id'] == selected_combination_id else 'false'"
+                                                        ><t t-out="combination_option['name']" /></button>
+                                                    </t>
+                                                </div>
+                                            </div>
+                                        </t>
+
+                                        <!-- Month navigation (always visible) -->
+                                        <div
+                                            class="o_wab_month_nav d-flex justify-content-between align-items-center mb-3"
+                                        >
+                                            <t t-if="start > now">
+                                                <a
+                                                    t-attf-href="/book/#{booking_type.website_slug}/#{start_previous.year}/#{start_previous.month}#{selection_query}"
+                                                    class="o_wab_nav_btn o_wab_month_link"
+                                                    aria-label="Previous month"
+                                                >
+                                                    <i class="fa fa-chevron-left" />
+                                                </a>
+                                            </t>
+                                            <span t-else="" style="width:2.2rem" />
+                                            <span
+                                                class="o_wab_month_label"
+                                                t-out="start.strftime('%B %Y')"
+                                            />
+                                            <a
+                                                t-attf-href="/book/#{booking_type.website_slug}/#{start_next.year}/#{start_next.month}#{selection_query}"
+                                                class="o_wab_nav_btn o_wab_month_link"
+                                                aria-label="Next month"
+                                            >
+                                                <i class="fa fa-chevron-right" />
+                                            </a>
+                                        </div>
+
+                                        <!-- No slots this month -->
+                                        <t t-if="not slots">
+                                            <div class="o_wab_empty_month">
+                                                <i class="fa fa-calendar-o d-block o_wab_empty_month_icon" />
+                                                <p class="mb-2">
+                                                    No available slots this month.
+                                                </p>
+                                                <a
+                                                    t-attf-href="/book/#{booking_type.website_slug}/#{start_next.year}/#{start_next.month}#{selection_query}"
+                                                    class="btn btn-outline-primary d-inline-flex align-items-center gap-2 o_wab_month_link o_wab_next_month_btn"
+                                                >
+                                                    <span>Try next month</span>
+                                                    <i class="fa fa-arrow-right" aria-hidden="true" />
                                                 </a>
                                             </div>
+                                        </t>
 
+                                        <t t-if="slots">
                                             <!-- Calendar table -->
                                             <table
                                                 class="table text-center o_wab_table mb-2"
@@ -155,7 +289,7 @@
                                                                 <td>
                                                                     <div
                                                                         t-att-class="'o_wab_day' + (' o_wab_day_available' if has_slots else '') + (' text-muted' if day.month != start.month else '')"
-                                                                        t-att-data-date="day.isoformat() if has_slots else None"
+                                                                        t-att-data-date="day.isoformat() if day.month == start.month else None"
                                                                     >
                                                                         <t
                                                                             t-out="day.day"
@@ -167,19 +301,41 @@
                                                     </t>
                                                 </tbody>
                                             </table>
-
-                                            <!-- Timezone note -->
-                                            <p
-                                                class="o_wab_tz_note text-center mt-1 mb-0"
+                                            <div
+                                                class="o_wab_timezone mt-3 d-flex flex-wrap align-items-center justify-content-center gap-2"
                                             >
-                                                Times in
-                                                <span
-                                                t-field="booking_type.resource_calendar_id.tz"
-                                            />
+                                                <label
+                                                    for="o_wab_timezone"
+                                                    class="text-muted small mb-0"
+                                                >Timezone:</label>
+                                                <select
+                                                    id="o_wab_timezone"
+                                                    class="form-select form-select-sm o_wab_timezone_select w-auto"
+                                                    aria-label="Timezone"
+                                                >
+                                                    <t
+                                                        t-foreach="timezone_options"
+                                                        t-as="timezone_option"
+                                                    >
+                                                        <option
+                                                            t-att-value="timezone_option[0]"
+                                                            t-att-selected="timezone_option[0] == selected_tz and 'selected' or None"
+                                                        >
+                                                            <t t-out="timezone_option[1]" />
+                                                        </option>
+                                                    </t>
+                                                </select>
+                                            </div>
+                                            <p
+                                                class="o_wab_tz_note text-center mt-3 mb-0"
+                                            >
+                                                Displayed times update for the selected timezone.
                                             </p>
-                                        </div>
+                                        </t>
+                                    </div>
 
-                                        <!-- Right: Slots panel -->
+                                    <!-- Right: Slots panel -->
+                                    <t t-if="slots">
                                         <div>
                                             <div
                                                 id="o_wab_slots_panel"
@@ -198,13 +354,20 @@
                                                 >Select a day to view available times</span>
                                             </div>
                                         </div>
-                                    </div>
+                                    </t>
+                                </div>
 
-                                    <!-- Hidden slot data for JS -->
+                                <!-- Hidden slot data for JS -->
+                                <t t-if="slots">
                                     <div
                                         class="d-none"
                                         id="o_wab_slot_data"
+                                        t-att-data-slot-endpoint="'/book/%s/slots' % booking_type.website_slug"
+                                        t-att-data-year="start.year"
+                                        t-att-data-month="start.month"
                                         t-att-data-slots="slot_data_json"
+                                        t-att-data-selected-tz="selected_tz"
+                                        t-att-data-selected-combination-id="selected_combination_id or ''"
                                     />
                                 </t>
 
@@ -227,6 +390,25 @@
                                             name="when"
                                             id="o_wab_when"
                                         />
+                                        <input
+                                            type="hidden"
+                                            name="tz"
+                                            t-att-value="selected_tz"
+                                        />
+                                        <input
+                                            type="hidden"
+                                            name="combination_id"
+                                            t-att-value="selected_combination_id or ''"
+                                        />
+                                        <!-- Honeypot — bots fill this, humans don't -->
+                                        <input
+                                            type="text"
+                                            name="website"
+                                            class="o_wab_hp"
+                                            tabindex="-1"
+                                            autocomplete="off"
+                                            aria-hidden="true"
+                                        />
                                         <div class="mb-3">
                                             <span class="o_wab_selected_slot">
                                                 <i class="fa fa-calendar-check-o" />
@@ -234,7 +416,7 @@
                                             </span>
                                         </div>
                                         <div class="row g-3 mb-3">
-                                            <div class="col-md-6">
+                                            <div class="col-md-4">
                                                 <label
                                                     for="o_wab_name"
                                                     class="form-label"
@@ -246,9 +428,10 @@
                                                     name="name"
                                                     required="required"
                                                     placeholder="Your full name"
+                                                    t-att-value="contact_prefill.get('name')"
                                                 />
                                             </div>
-                                            <div class="col-md-6">
+                                            <div class="col-md-4">
                                                 <label
                                                     for="o_wab_email"
                                                     class="form-label"
@@ -260,15 +443,58 @@
                                                     name="email"
                                                     required="required"
                                                     placeholder="you@example.com"
+                                                    t-att-value="contact_prefill.get('email')"
+                                                />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label
+                                                    for="o_wab_phone"
+                                                    class="form-label"
+                                                >Phone</label>
+                                                <input
+                                                    type="tel"
+                                                    class="form-control"
+                                                    id="o_wab_phone"
+                                                    name="phone"
+                                                    required="required"
+                                                    placeholder="(555) 123-4567"
+                                                    t-att-value="contact_prefill.get('phone')"
+                                                />
+                                            </div>
+                                            <div class="col-12">
+                                                <label
+                                                    for="o_wab_discussion"
+                                                    class="form-label"
+                                                >What would you like to discuss?</label>
+                                                <textarea
+                                                    class="form-control"
+                                                    id="o_wab_discussion"
+                                                    name="discussion"
+                                                    rows="4"
+                                                    placeholder="Share any details that would help us prepare for the meeting"
                                                 />
                                             </div>
                                         </div>
+                                        <t t-if="booking_type.require_upfront_payment">
+                                            <div class="alert alert-info d-flex align-items-center gap-2" role="status">
+                                                <i class="fa fa-credit-card" />
+                                                <span>
+                                                    This booking requires an upfront payment of
+                                                    <strong
+                                                        t-out="booking_type.website_payment_price"
+                                                        t-options="{'widget': 'monetary', 'display_currency': booking_type.currency_id}"
+                                                    />
+                                                    to schedule your appointment.
+                                                </span>
+                                            </div>
+                                        </t>
                                         <button
                                             type="submit"
                                             class="btn btn-primary o_wab_submit_btn"
                                         >
                                             <i class="fa fa-check me-1" />
-                                            Confirm Booking
+                                            <t t-if="booking_type.require_upfront_payment">Continue to Checkout</t>
+                                            <t t-else="">Confirm Booking</t>
                                         </button>
                                     </form>
                                 </div>
@@ -378,4 +604,90 @@
             </div>
         </t>
     </template>
+    <template id="paid_booking_shop_confirmation" inherit_id="website_sale.confirmation">
+        <xpath expr="//t[@t-call='website_sale.payment_confirmation_status']/following-sibling::div[contains(@class, 'card')][1]" position="after">
+            <section
+                t-if="order.website_booking_ids"
+                class="card mt-3 o_wab_paid_booking_confirmation"
+                role="status"
+            >
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <h4 class="h5 mb-0">
+                            <i class="fa fa-calendar-check-o me-1 text-success" />
+                            Booking Scheduled
+                        </h4>
+                    </div>
+                    <p class="text-muted mb-3">
+                        Your payment is complete and your booking has been scheduled.
+                    </p>
+                    <div class="vstack gap-3">
+                        <article
+                            t-foreach="order.website_booking_ids"
+                            t-as="booking"
+                            class="o_wab_paid_booking_card border rounded overflow-hidden"
+                        >
+                            <div class="row g-0">
+                                <div class="col-md-3 bg-light d-flex align-items-center justify-content-center">
+                                    <img
+                                        t-if="booking.type_id.website_card_image"
+                                        t-att-src="'/web/image/resource.booking.type/%s/website_card_image?width=400&amp;height=400' % booking.type_id.id"
+                                        t-att-alt="booking.type_id.name"
+                                        class="img-fluid h-100 w-100 o_wab_paid_booking_img"
+                                    />
+                                    <i
+                                        t-else=""
+                                        class="fa fa-calendar-check-o fa-3x text-muted py-4"
+                                        aria-hidden="true"
+                                    />
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="p-3">
+                                        <div class="d-flex align-items-start justify-content-between gap-2">
+                                            <h5 class="mb-1" t-out="booking.type_id.name" />
+                                            <span class="badge text-bg-success flex-shrink-0">Booked</span>
+                                        </div>
+                                        <div class="text-muted small d-flex flex-wrap gap-3 mb-2">
+                                            <span t-if="booking.start">
+                                                <i class="fa fa-clock-o me-1" />
+                                                <span t-field="booking.start" />
+                                            </span>
+                                            <span t-if="booking.duration">
+                                                <i class="fa fa-hourglass-half me-1" />
+                                                <t t-out="'%d min' % int(booking.duration * 60)" />
+                                            </span>
+                                            <span t-if="booking.type_id.location">
+                                                <i class="fa fa-map-marker me-1" />
+                                                <t t-out="booking.type_id.location" />
+                                            </span>
+                                        </div>
+                                        <div
+                                            t-if="booking.type_id.website_description"
+                                            class="small text-muted mb-3"
+                                            t-field="booking.type_id.website_description"
+                                        />
+                                        <a
+                                            t-att-href="booking.get_portal_url()"
+                                            class="btn btn-outline-primary btn-sm"
+                                        >View details</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+        </xpath>
+    </template>
+
+    <data noupdate="1">
+        <record id="booking_landing_website_page" model="website.page">
+            <field name="name">Book an appointment</field>
+            <field name="type">qweb</field>
+            <field name="url">/book</field>
+            <field name="is_published">True</field>
+            <field name="view_id" ref="website_appointment_booking.booking_landing_page" />
+            <field name="website_indexed" eval="True" />
+        </record>
+    </data>
 </odoo>

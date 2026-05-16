@@ -7,11 +7,70 @@
 $wab-radius: 0.75rem;
 $wab-radius-sm: 0.5rem;
 
+.o_wab_hp {
+    position: absolute;
+    left: -9999px;
+    opacity: 0;
+}
+
 // ---------------------------------------------------------------------------
 // Page wrapper
 // ---------------------------------------------------------------------------
 .o_wab_page {
     min-height: 60vh;
+}
+
+.o_wab_booking_card {
+    border: 1px solid var(--o-gray-200, #e9ecef);
+    border-radius: $wab-radius;
+    overflow: hidden;
+    box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.04);
+
+    .o_wab_booking_card_img,
+    .o_wab_booking_card_placeholder {
+        height: 12rem;
+        object-fit: cover;
+        background: var(--o-gray-100, #f8f9fa);
+    }
+
+    .o_wab_booking_card_placeholder {
+        color: var(--o-gray-300, #dee2e6);
+        font-size: 3rem;
+    }
+
+    .o_wab_card_description {
+        max-height: 4.5rem;
+        overflow: hidden;
+    }
+
+    .o_wab_card_meta {
+        color: var(--o-gray-600, #6c757d);
+        font-size: 0.82rem;
+
+        .o_wab_card_meta_item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        i {
+            width: 0.9rem;
+            color: var(--o-gray-500, #adb5bd);
+            text-align: center;
+        }
+    }
+
+    .o_wab_card_avatar {
+        width: 2rem;
+        height: 2rem;
+        object-fit: cover;
+        border: 2px solid #fff;
+        background: #fff;
+
+        &:not(:first-child) {
+            margin-left: -0.5rem;
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -21,7 +80,7 @@ $wab-radius-sm: 0.5rem;
     border: none;
     border-radius: $wab-radius;
     background: var(--o-gray-100, #f8f9fa);
-    border-left: 4px solid var(--o-brand-primary, #714b67);
+    border-left: 4px solid var(--o-color-1, #714b67);
 
     .o_wab_title {
         font-weight: 700;
@@ -160,7 +219,7 @@ $wab-radius-sm: 0.5rem;
             transform: translateX(-50%);
             width: 4px;
             height: 4px;
-            background: var(--o-brand-primary, #714b67);
+            background: var(--o-color-1, #714b67);
             border-radius: 50%;
         }
 
@@ -171,7 +230,7 @@ $wab-radius-sm: 0.5rem;
 
     // Selected day
     .o_wab_day_selected {
-        background: var(--o-brand-primary, #714b67) !important;
+        background: var(--o-color-1, #714b67) !important;
         color: #fff !important;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
@@ -226,8 +285,8 @@ $wab-radius-sm: 0.5rem;
     }
 
     &.active {
-        background: var(--o-brand-primary, #714b67);
-        border-color: var(--o-brand-primary, #714b67);
+        background: var(--o-color-1, #714b67);
+        border-color: var(--o-color-1, #714b67);
         color: #fff;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     }
@@ -314,10 +373,19 @@ $wab-radius-sm: 0.5rem;
     padding: 2.5rem 1.5rem;
     text-align: center;
 
-    i {
+    .o_wab_empty_month_icon {
         font-size: 2.5rem;
         color: var(--o-gray-300, #dee2e6);
         margin-bottom: 1rem;
+    }
+
+    .o_wab_next_month_btn {
+        line-height: 1.5;
+
+        i {
+            font-size: 0.8rem;
+            margin-bottom: 0;
+        }
     }
 
     p {
@@ -385,6 +453,18 @@ $wab-radius-sm: 0.5rem;
                 color: var(--o-body-color, #212529);
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Paid checkout confirmation card
+// ---------------------------------------------------------------------------
+.o_wab_paid_booking_card {
+    background: #fff;
+
+    .o_wab_paid_booking_img {
+        min-height: 10rem;
+        object-fit: cover;
     }
 }
 
