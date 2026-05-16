@@ -7,7 +7,7 @@ import calendar
 from datetime import datetime, timedelta
 
 from dateutil.relativedelta import relativedelta
-from pytz import timezone
+from pytz import timezone, utc
 
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
@@ -66,6 +66,71 @@ class ResourceBooking(models.Model):
             "Only one event per resource booking can exist.",
         ),
     ]
+
+    def _get_portal_timezone(self):
+        self.ensure_one()
+        return (
+            self.type_id.resource_calendar_id.tz
+            or self.meeting_id.event_tz
+            or self.env.user.tz
+            or "UTC"
+        )
+
+    def _get_portal_timezone_label(self):
+        self.ensure_one()
+        timezone_labels = {
+            "America/Chicago": "central time",
+            "US/Central": "central time",
+            "America/New_York": "eastern time",
+            "US/Eastern": "eastern time",
+            "America/Denver": "mountain time",
+            "US/Mountain": "mountain time",
+            "America/Phoenix": "mountain time",
+            "America/Los_Angeles": "pacific time",
+            "US/Pacific": "pacific time",
+        }
+        tz_name = self._get_portal_timezone()
+        return timezone_labels.get(tz_name, tz_name.replace("_", " ").lower())
+
+    def _get_portal_start_display(self):
+        self.ensure_one()
+        if not self.start:
+            return ""
+        start = fields.Datetime.context_timestamp(self, self.start)
+        time_display = start.strftime("%I:%M %p").lstrip("0")
+        return f"{start.month}/{start.day}/{start.year % 100} {time_display}"
+
+    def _get_portal_duration_display(self):
+        self.ensure_one()
+        if not self.duration:
+            return ""
+        minutes = int(self.duration * 60)
+        if minutes < 60:
+            return f"{minutes} min"
+        hours = minutes // 60
+        mins = minutes % 60
+        if mins == 0:
+            return f"{hours} hr"
+        return f"{hours} hr {mins} min"
+
+    def _get_portal_timezone_label(self):
+        self.ensure_one()
+        if not self.start:
+            return ""
+        start = fields.Datetime.context_timestamp(self, self.start)
+        tz_name = start.tzinfo.zone if hasattr(start.tzinfo, "zone") else str(start.tzinfo)
+        timezone_labels = {
+            "America/Chicago": "central time",
+            "US/Central": "central time",
+            "America/New_York": "eastern time",
+            "US/Eastern": "eastern time",
+            "America/Denver": "mountain time",
+            "US/Mountain": "mountain time",
+            "America/Phoenix": "mountain time",
+            "America/Los_Angeles": "pacific time",
+            "US/Pacific": "pacific time",
+        }
+        return timezone_labels.get(tz_name, tz_name.replace("_", " ").lower())
 
     active = fields.Boolean(default=True)
     meeting_id = fields.Many2one(
@@ -559,6 +624,11 @@ class ResourceBooking(models.Model):
         start_dt = max(
             start_dt, now + timedelta(hours=self.type_id.modifications_deadline)
         )
+        max_advance_days = self.type_id.max_advance_booking_days
+        max_start_dt = False
+        if max_advance_days:
+            max_start_dt = now + timedelta(days=max_advance_days)
+            end_dt = min(end_dt, max_start_dt + booking_duration)
         # available_intervals should start with the beginning of the work day,
         # to compute each slot based on the beginning of the work day.
         workday_min = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -573,6 +643,7 @@ class ResourceBooking(models.Model):
                 test_stop = test_start + booking_duration
                 if (
                     test_start >= start_dt
+                    and (not max_start_dt or test_start <= max_start_dt)
                     and test_start >= available_start
                     and test_stop <= available_stop
                 ):
@@ -581,6 +652,43 @@ class ResourceBooking(models.Model):
                     result[test_start.date()].append(test_start)
                 test_start += slot_duration
         return result
+
+    def _get_buffered_booking_intervals(self, start_dt, end_dt, combination):
+        """Return resource-level post-booking buffer intervals for a combination."""
+        if not combination:
+            return Intervals([])
+        resources = combination.resource_ids.filtered("booking_buffer")
+        if not resources:
+            return Intervals([])
+        max_buffer_delta = timedelta(hours=max(resources.mapped("booking_buffer")))
+        if not max_buffer_delta:
+            return Intervals([])
+        try:
+            booking_id = self.id or self._origin.id or -1
+        except AttributeError:
+            booking_id = -1
+        search_start = (start_dt - max_buffer_delta).astimezone(utc).replace(tzinfo=None)
+        search_end = end_dt.astimezone(utc).replace(tzinfo=None)
+        buffered_bookings = self.env["resource.booking"].sudo().search(
+            [
+                ("id", "!=", booking_id),
+                ("combination_id.resource_ids", "in", resources.ids),
+                ("meeting_id", "!=", False),
+                ("stop", ">", fields.Datetime.to_string(search_start)),
+                ("stop", "<", fields.Datetime.to_string(search_end)),
+            ]
+        )
+        intervals = []
+        for booking in buffered_bookings:
+            overlapping_resources = booking.combination_id.resource_ids & resources
+            buffer_hours = max(overlapping_resources.mapped("booking_buffer") or [0])
+            if not buffer_hours:
+                continue
+            buffer_start = fields.Datetime.context_timestamp(self, booking.stop)
+            buffer_stop = buffer_start + timedelta(hours=buffer_hours)
+            if buffer_start < end_dt and buffer_stop > start_dt:
+                intervals.append((buffer_start, buffer_stop, booking))
+        return Intervals(intervals)
 
     def _get_intervals(self, start_dt, end_dt, combination=None):
         """Get available intervals for this booking,
@@ -610,8 +718,14 @@ class ResourceBooking(models.Model):
             or booking.mapped("type_id.combination_rel_ids.combination_id")
         ).with_context(analyzing_booking=booking_id)
         tz = timezone(self.type_id.resource_calendar_id.tz)
-        result &= combinations._get_intervals(start_dt, end_dt, tz)
-        return result
+        available_result = Intervals([])
+        for combination in combinations:
+            combination_result = result & combination._get_intervals(start_dt, end_dt, tz)
+            combination_result -= booking._get_buffered_booking_intervals(
+                start_dt, end_dt, combination
+            )
+            available_result |= combination_result
+        return available_result
 
     def _sync_booking_activities_date(self):
         for rec in self.filtered("booking_activity_ids"):
@@ -631,7 +745,8 @@ class ResourceBooking(models.Model):
     def write(self, vals):
         """Sync booking with meeting if needed."""
         result = super().write(vals)
-        self._sync_meeting()
+        if set(vals) != {"access_token"}:
+            self._sync_meeting()
         if vals.get("start") or "meeting_id" in vals:
             self._sync_booking_activities_date()
         return result

@@ -12,6 +12,11 @@ class ResourceBookingType(models.Model):
     _description = "Resource Booking Type"
     _sql_constraints = [
         ("duration_positive", "CHECK(duration > 0)", "Duration must be positive."),
+        (
+            "max_advance_booking_days_nonnegative",
+            "CHECK(max_advance_booking_days >= 0)",
+            "Maximum advance booking days must be zero or positive.",
+        ),
     ]
 
     active = fields.Boolean(default=True)
@@ -58,6 +63,14 @@ class ResourceBookingType(models.Model):
         required=True,
         default=0.5,  # 30 minutes
         help=("Booking default duration."),
+    )
+    max_advance_booking_days = fields.Integer(
+        string="Maximum Advance Booking Days",
+        default=0,
+        help=(
+            "Limit public/backend slot suggestions to starts within this many days "
+            "from now. Set to 0 to allow the normal calendar range."
+        ),
     )
     slot_duration = fields.Float(
         required=True,
