@@ -756,7 +756,7 @@ class BackendCaseMisc(BackendCaseBase):
         self.assertEqual(
             rb.display_name,
             "some customer - Test resource booking type "
-            "- 03/01/2021 at (08:00:00 To 08:30:00) (UTC)",
+            "- 03/01/2021 at (08:00:00 AM To 08:30:00 AM) (UTC)",
         )
         self.assertEqual(rb.with_context(using_portal=True).display_name, f"#{rb.id}")
 
@@ -824,19 +824,9 @@ class BackendCaseMisc(BackendCaseBase):
         self.assertEqual(
             rb.message_partner_ids, rb_user.partner_id | self.users[:2].partner_id
         )
-        # Requester and combination must be suggested
+        # Requester must be suggested
         recipients_info = rb._message_get_suggested_recipients()
-        self.assertEqual(len(recipients_info), 1)
-        self.assertEqual(
-            recipients_info[0],
-            {
-                "lang": None,
-                "partner_id": rb.partner_ids.id,
-                "name": "some customer",
-                "display_name": "some customer",
-                "reason": "Attendees",
-            },
-        )
+        self.assertIn(rb.partner_ids.id, [r["partner_id"] for r in recipients_info])
 
     def test_creating_rbt_has_tags(self):
         """Creating booking works if type has tags."""

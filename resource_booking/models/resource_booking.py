@@ -518,66 +518,24 @@ class ResourceBooking(models.Model):
 
     @api.model
     def _get_name_formatted(self, partner, type_, meeting=None):
-        """Produce a formatted display name.
-
-        For scheduled bookings, format the time range using 24-hour time
-        to ensure deterministic output in tests and UI, independent of
-        the language's time_format (avoid AM/PM additions).
-        """
+        """Produce a formatted display name."""
         name = f"{partner.display_name} - {type_.display_name}"
         if meeting and meeting.start and meeting.stop:
-            # Use 24-hour time for deterministic formatting
-            from odoo.tools.misc import get_lang
-
-            timezone = (
-                self.env.context.get("tz") or self.env.user.partner_id.tz or "UTC"
+            display_time = meeting._get_display_time(
+                meeting.start, meeting.stop, meeting.duration, meeting.allday
             )
-            # Compute localized datetimes
-            self_tz = self.with_context(tz=timezone)
-            start_dt = fields.Datetime.context_timestamp(
-                self_tz, fields.Datetime.from_string(meeting.start)
-            )
-            stop_dt = fields.Datetime.context_timestamp(
-                self_tz, fields.Datetime.from_string(meeting.stop)
-            )
-            # Date from current language; time forced to 24-hour
-            date_fmt = get_lang(self.env).date_format
-            time_fmt = "%H:%M:%S"
-            date_str = start_dt.strftime(date_fmt)
-            start_str = start_dt.strftime(time_fmt)
-            end_str = stop_dt.strftime(time_fmt)
-            name += f" - {date_str} at ({start_str} To {end_str}) ({timezone})"
+            name += f" - {display_time}"
         return name
 
     def _get_portal_display_time(self):
-        """Return a deterministic 24-hour display string for the portal.
-
-        Example: "MM/DD/YYYY at (HH:MM:SS To HH:MM:SS) (TZ)".
-        Uses the booking's meeting start/stop, current language's date format,
-        and 24-hour time formatting, in the timezone from context/user.
-        """
+        """Return the booking meeting's display time for the portal."""
         self.ensure_one()
         meeting = self.meeting_id
         if not (meeting and meeting.start and meeting.stop):
             return ""
-        from odoo.tools.misc import get_lang
-
-        timezone = self.env.context.get("tz") or self.env.user.partner_id.tz or "UTC"
-        # Compute localized datetimes
-        self_tz = self.with_context(tz=timezone)
-        start_dt = fields.Datetime.context_timestamp(
-            self_tz, fields.Datetime.from_string(meeting.start)
+        return meeting._get_display_time(
+            meeting.start, meeting.stop, meeting.duration, meeting.allday
         )
-        stop_dt = fields.Datetime.context_timestamp(
-            self_tz, fields.Datetime.from_string(meeting.stop)
-        )
-        # Date from current language; time forced to 24-hour
-        date_fmt = get_lang(self.env).date_format
-        time_fmt = "%H:%M:%S"
-        date_str = start_dt.strftime(date_fmt)
-        start_str = start_dt.strftime(time_fmt)
-        end_str = stop_dt.strftime(time_fmt)
-        return f"{date_str} at ({start_str} To {end_str}) ({timezone})"
 
     def _get_best_combination(self):
         """Pick best combination based on current booking state."""
@@ -724,51 +682,14 @@ class ResourceBooking(models.Model):
             )
         return result
 
-    def _message_get_suggested_recipients(
-        self,
-        reply_discussion=False,
-        reply_message=None,
-        no_create=True,
-        primary_email=False,
-        additional_partners=None,
-    ):
-        """Suggest related partners.
-
-        Compatibility: when called without context (tests), return a simple
-        list of attendee partners with a ``reason`` and ``lang`` keys, matching
-        the expectations of module tests. For normal chatter/webclient flows
-        (which pass kwargs like ``reply_discussion``), fall back to the core
-        implementation so the UI can build rich suggestions.
-        """
-        # If any of the optional parameters are used, delegate to super
-        # to preserve Discuss/composer behavior.
-        if (
-            reply_discussion
-            or reply_message is not None
-            or primary_email
-            or additional_partners
-        ):
-            return super()._message_get_suggested_recipients(
-                reply_discussion=reply_discussion,
-                reply_message=reply_message,
-                no_create=no_create,
-                primary_email=primary_email,
-                additional_partners=additional_partners,
-            )
-
-        # Default simple behavior for tests calling without parameters
-        self.ensure_one()
-        reason = self._fields["partner_ids"].string
-        return [
-            {
-                "lang": None,
-                "partner_id": p.id,
-                "name": p.name,
-                "display_name": p.display_name,
-                "reason": reason,
-            }
-            for p in self.partner_ids
-        ]
+    def _message_add_suggested_recipients(self, force_primary_email=False):
+        """Suggest the booking's attendees as recipients."""
+        suggested = super()._message_add_suggested_recipients(
+            force_primary_email=force_primary_email
+        )
+        for record in self:
+            suggested[record.id]["partners"] |= record.partner_ids
+        return suggested
 
     def action_schedule(self):
         """Redirect user to a simpler way to schedule this booking."""
