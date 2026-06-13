@@ -518,24 +518,11 @@ class ResourceBooking(models.Model):
 
     @api.model
     def _get_name_formatted(self, partner, type_, meeting=None):
-        """Produce a formatted display name."""
+        """Produce a beautifully formatted name."""
         name = f"{partner.display_name} - {type_.display_name}"
-        if meeting and meeting.start and meeting.stop:
-            display_time = meeting._get_display_time(
-                meeting.start, meeting.stop, meeting.duration, meeting.allday
-            )
-            name += f" - {display_time}"
+        if meeting:
+            name += f" - {meeting.display_time}"
         return name
-
-    def _get_portal_display_time(self):
-        """Return the booking meeting's display time for the portal."""
-        self.ensure_one()
-        meeting = self.meeting_id
-        if not (meeting and meeting.start and meeting.stop):
-            return ""
-        return meeting._get_display_time(
-            meeting.start, meeting.stop, meeting.duration, meeting.allday
-        )
 
     def _get_best_combination(self):
         """Pick best combination based on current booking state."""
