@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="Docutils: https://docutils.sourceforge.io/" />
-<title>Website Appointment Booking</title>
+<title>README.rst</title>
 <style type="text/css">
 
 /*
@@ -441,7 +441,16 @@ booking page.</li>
 <ol class="arabic simple">
 <li>Share the URL <tt class="docutils literal"><span class="pre">/book/&lt;slug&gt;</span></tt> with your clients or embed it on your
 website.</li>
-<li>Visitors see a monthly calendar with available days highlighted.</li>
+<li>Visitors see a monthly calendar with available days highlighted.
+<tt class="docutils literal"><span class="pre">/book/&lt;slug&gt;</span></tt> opens on the first month that has availability
+rather than on the current month, so a booking type whose slots start
+later — an event, or a resource booked solid for several weeks — does
+not greet visitors with an empty grid and leave them guessing how far
+forward to click. The search looks up to twelve months ahead; if
+nothing is found in that window the current month is shown with its
+empty state. A URL that names a month explicitly, such as
+<tt class="docutils literal"><span class="pre">/book/&lt;slug&gt;/2026/10</span></tt>, is always honoured as given, so the
+previous/next arrows and the browser’s back button behave normally.</li>
 <li>Clicking a day reveals the available time slots for that day.</li>
 <li>Clicking a time slot shows a simple form asking for name and email.</li>
 <li>Upon confirmation, a <tt class="docutils literal">resource.booking</tt> record is created and
