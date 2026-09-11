@@ -64,12 +64,51 @@ class TestWebsiteAppointmentBooking(HttpCase):
         self.assertTrue(page.cssselect(".o_wab_meta_pill:contains('30 min')"))
 
     def test_booking_page_february_no_slots(self):
-        """February 2021 has no available Monday/Tuesday slots (too close)."""
-        page = self._url_xml("/book/test-booking")
-        # February should have no available slots (within modification deadline)
+        """February 2021 has no available Monday/Tuesday slots (too close).
+
+        Asked for explicitly, because a bare /book/<slug> no longer lands here
+        -- it redirects to the first month with availability. Keeping the
+        assertion on the explicit URL preserves what this test was really
+        about: February is genuinely empty, which is the precondition the
+        redirect tests below rely on.
+        """
+        page = self._url_xml("/book/test-booking/2021/2")
         self.assertTrue(
             page.cssselect(".o_wab_empty_month:contains('No available slots')")
         )
+
+    def test_bare_url_redirects_to_first_available_month(self):
+        """/book/<slug> opens on the first month with slots, not on today's.
+
+        Frozen at 2021-02-26, a Friday, against a Mondays-and-Tuesdays
+        calendar: nothing is left in February, so the visitor should land on
+        March rather than be shown an empty grid and left to guess how far
+        forward to click.
+        """
+        response = self.url_open("/book/test-booking", allow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            response.headers["Location"].endswith("/book/test-booking/2021/3"),
+            response.headers["Location"],
+        )
+
+    def test_explicit_month_is_not_redirected(self):
+        """An explicit month is honoured, empty or not.
+
+        Bouncing a visitor who navigated deliberately would break the back
+        button and make the prev/next arrows unusable -- click back a month,
+        get thrown forward again.
+        """
+        response = self.url_open("/book/test-booking/2021/2", allow_redirects=False)
+        self.assertEqual(response.status_code, 200)
+
+    def test_redirect_preserves_query_string(self):
+        """?tz= survives the hop, or the visitor's timezone choice is lost."""
+        response = self.url_open(
+            "/book/test-booking?tz=Asia/Tokyo", allow_redirects=False
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("tz=Asia", response.headers["Location"])
 
     def test_booking_page_march_has_slots(self):
         """March 2021 should have available slots on Mondays and Tuesdays."""
@@ -486,3 +525,53 @@ class TestBookingRaceCondition(HttpCase):
         # Should redirect back to calendar with error, not to success
         self.assertNotIn("/success", response.url)
         self.assertIn("error=", response.url)
+
+
+@freeze_time("2021-02-26 09:00:00", tick=True)
+@tagged("post_install", "-at_install")
+class TestFirstAvailableMonthExhausted(HttpCase):
+    """A booking type with no availability at all must still render.
+
+    Separate class so the calendar is closed in ``setUpClass`` and is therefore
+    visible to the HTTP server thread.
+
+    This is the case the look-ahead cap exists for. Without a bound, an event
+    that has finished or a resource whose hours were removed would send every
+    anonymous page load walking forward a month at a time for ever, and the
+    first symptom would be a slow page rather than a clear error.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        create_test_data(cls)
+        cls.rbt.write(
+            {
+                "website_published": True,
+                "website_slug": "closed-test",
+            }
+        )
+        # Close the calendar for a decade, the way a finished event would be.
+        cls.env["resource.calendar.leaves"].create(
+            {
+                "name": "Closed",
+                "calendar_id": cls.rbt.resource_calendar_id.id,
+                "date_from": "2020-01-01 00:00:00",
+                "date_to": "2030-01-01 00:00:00",
+                "resource_id": False,
+            }
+        )
+
+    def test_no_availability_renders_instead_of_redirecting(self):
+        response = self.url_open("/book/closed-test", allow_redirects=False)
+        self.assertEqual(response.status_code, 200)
+
+    def test_no_availability_shows_the_empty_state(self):
+        page = self._url_xml("/book/closed-test")
+        self.assertTrue(
+            page.cssselect(".o_wab_empty_month:contains('No available slots')")
+        )
+
+    def _url_xml(self, url, data=None, timeout=10):
+        response = self.url_open(url, data, timeout=timeout)
+        return fromstring(response.content)

@@ -11,11 +11,22 @@ from dateutil.parser import isoparse
 from dateutil.relativedelta import relativedelta
 from werkzeug.exceptions import NotFound
 
-from odoo import http
+from odoo import fields, http
 from odoo.exceptions import ValidationError
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
+
+# How many months ahead a bare ``/book/<slug>`` will look for availability
+# before giving up and rendering the current month's empty state.
+#
+# Bounded on purpose. A booking type whose calendar is entirely closed -- an
+# event that has finished, a resource with no working hours -- would otherwise
+# walk forward for ever on every anonymous page load, one slot computation per
+# month, and the first symptom would be a slow page rather than a clear error.
+# Twelve months is long enough for an event booked a year out, and short enough
+# that the degenerate case costs twelve bounded queries.
+_MAX_MONTH_LOOKAHEAD = 12
 
 
 class WebsiteAppointmentBooking(http.Controller):
@@ -133,6 +144,30 @@ class WebsiteAppointmentBooking(http.Controller):
                     )
         return result
 
+    @staticmethod
+    def _first_month_with_slots(phantom, now):
+        """Return the first ``(year, month)`` from ``now`` that has any slot.
+
+        Returns ``None`` when nothing is available inside
+        ``_MAX_MONTH_LOOKAHEAD``, which the caller treats as "render the
+        current month and let the empty state explain itself".
+
+        Deliberately a month-at-a-time loop rather than one slot computation
+        over the whole horizon. The common case -- a booking type that is
+        available this month -- costs exactly one computation and is no slower
+        than before; a year-wide query would instead build thousands of slot
+        datetimes on every page load to answer a question the first one already
+        settled.
+        """
+        probe = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        booking_duration = timedelta(hours=phantom.duration)
+        for _offset in range(_MAX_MONTH_LOOKAHEAD):
+            stop = probe + relativedelta(months=1) + booking_duration
+            if phantom._get_available_slots(probe, stop):
+                return probe.year, probe.month
+            probe += relativedelta(months=1)
+        return None
+
     @http.route(
         [
             "/book/<slug>",
@@ -153,6 +188,36 @@ class WebsiteAppointmentBooking(http.Controller):
         # Invalid values silently fall back to the resource tz.
         effective_tz = self._validate_tz(kwargs.get("tz")) or resource_tz
         phantom = self._create_phantom_booking(booking_type, tz=effective_tz)
+
+        # A bare /book/<slug> opens on the first month that actually has
+        # availability, not on today's month.
+        #
+        # The month grid is the whole interface, so landing a visitor on an
+        # empty one asks them to guess how far forward to click. An event
+        # booking type is the worst case -- a show three months out shows three
+        # empty months first -- but a resource that is simply busy until next
+        # month has the same problem, and "No available slots this month" reads
+        # like "no availability" rather than "not in September".
+        #
+        # Only when BOTH year and month are absent. A visitor who navigated to
+        # an explicit month asked for that month and gets it, empty or not:
+        # silently bouncing them somewhere else would break the back button and
+        # make the prev/next arrows unusable.
+        #
+        # 302, never 301. Availability moves -- the correct month changes as
+        # slots fill and events pass -- and a permanent redirect would be
+        # cached by the browser and keep sending someone to a month that has
+        # since emptied out, with no way to clear it.
+        if year is None and month is None:
+            now = fields.Datetime.context_timestamp(phantom, fields.Datetime.now())
+            found = self._first_month_with_slots(phantom, now)
+            if found and (found[0], found[1]) != (now.year, now.month):
+                target = f"/book/{slug}/{found[0]}/{found[1]}"
+                query = request.httprequest.query_string.decode()
+                return request.redirect(
+                    f"{target}?{query}" if query else target, code=302
+                )
+
         calendar_ctx = phantom._get_calendar_context(year, month)
         lang = calendar_ctx["res_lang"]
         time_format = lang.time_format.replace(":%S", "")
