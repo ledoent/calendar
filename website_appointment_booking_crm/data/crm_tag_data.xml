@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2026 ForgeFlow S.L.
+     License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl). -->
+<odoo noupdate="1">
+    <record id="crm_tag_out_of_hours_request" model="crm.tag">
+        <field name="name">Out-of-hours request</field>
+    </record>
+</odoo>

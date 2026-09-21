@@ -7,9 +7,22 @@ appointment without logging in.
 
 Key features:
 
-- Public booking page at `/book/<slug>` for each published booking type
+- Public booking page at `/book/<slug>` for each published booking type,
+  listed in the website sitemap
 - Monthly calendar showing available time slots based on resource availability
-- Server-rendered slot data -- no extra AJAX calls needed
+- Slots displayed in the visitor's timezone, with a selector to switch
+- Server-rendered slot data: no extra AJAX calls needed
 - Automatic partner creation or reuse based on visitor email
-- Calendar invitation sent to both parties upon confirmation
+- Calendar invitation sent to both parties upon confirmation, organized by
+  the assigned resource
+- Submitted times are validated server-side against the offered slots
+- Honeypot and optional reCAPTCHA v3 protection on the public form
 - Race condition handling when two visitors try to book the same slot
+
+The out-of-hours request flow (lead creation for visitors whose working
+hours do not overlap the published calendar) lives in
+`website_appointment_booking_crm`.
+
+A narrated [demo video](static/description/demo.mp4) ships with the module:
+publishing a type, booking as a visitor, the out-of-hours request of the CRM
+extension, and the results in the back office.
