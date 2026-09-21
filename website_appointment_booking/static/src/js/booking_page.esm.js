@@ -18,8 +18,11 @@
  * (overrides browser detection); a dropdown lets the visitor pick.
  */
 
+import {FormGuard} from "@website_appointment_booking/js/form_guard.esm";
 import {Interaction} from "@web/public/interaction";
 import {registry} from "@web/core/registry";
+
+export const RECAPTCHA_ACTION = "website_appointment_booking";
 
 /** Build an ``Intl.DateTimeFormat`` keyed in the given timezone. */
 function _dateFormatterFor(tz) {
@@ -49,40 +52,38 @@ function _detectBrowserTz() {
 }
 
 /**
- * Out-of-hours request banner — the "Request a custom slot" CTA on the
- * booking page when the visitor's timezone has no overlap with the
- * published booking hours. Lives as a sibling of the main calendar
- * interaction so its toggle state is independent.
+ * Description block: when it holds several ``<details>`` sections, keep at
+ * most one open.
+ *
+ * Its own interaction rather than a ``dynamicContent`` entry on the calendar
+ * below, for two reasons: ``toggle`` does not bubble, so a delegated handler
+ * on an ancestor never fires, and the description sits outside
+ * ``.o_wab_calendar`` anyway. Each ``<details>`` is therefore bound directly.
  */
-export class WebsiteAppointmentRequestBanner extends Interaction {
-    static selector = ".o_wab_request_banner";
-    dynamicContent = {
-        ".o_wab_request_toggle": {"t-on-click": this.onToggle},
-    };
+export class WebsiteAppointmentDescription extends Interaction {
+    static selector = ".o_wab_description";
+
+    setup() {
+        this.details = this.el.querySelectorAll("details");
+        this.addListener(this.details, "toggle", (ev) => this.onToggle(ev));
+    }
 
     onToggle(ev) {
-        const form = this.el.querySelector("#o_wab_request_form");
-        const toggleBtn = ev.currentTarget;
-        if (!form) {
+        const el = ev.currentTarget;
+        if (!el.open) {
             return;
         }
-        const willShow = form.classList.contains("d-none");
-        form.classList.toggle("d-none", !willShow);
-        // Disable the toggle button when the form is open so a second click
-        // doesn't collapse the form while the user is mid-fill.
-        toggleBtn.setAttribute("disabled", "disabled");
-        toggleBtn.classList.add("d-none");
-        // Move focus to the name field so keyboard users land in the form.
-        const nameInput = form.querySelector("#o_wab_request_name");
-        if (nameInput) {
-            nameInput.focus();
+        for (const other of this.details) {
+            if (other !== el) {
+                other.removeAttribute("open");
+            }
         }
     }
 }
 
 registry
     .category("public.interactions")
-    .add("website_appointment_booking.request_banner", WebsiteAppointmentRequestBanner);
+    .add("website_appointment_booking.description", WebsiteAppointmentDescription);
 
 export class WebsiteAppointmentBooking extends Interaction {
     static selector = ".o_wab_calendar";
@@ -131,6 +132,8 @@ export class WebsiteAppointmentBooking extends Interaction {
             ? this.panel.querySelector(".o_wab_slots_list")
             : null;
         this.form = this.el.querySelector("#o_wab_form");
+        this.guard = new FormGuard(RECAPTCHA_ACTION);
+        this.guard.attach(this.form ? this.form.querySelector("form") : null);
         this.whenInput = this.el.querySelector("#o_wab_when");
         this.displayTzInput = this.el.querySelector("#o_wab_display_tz");
         this.selectedDisplay = this.el.querySelector("#o_wab_selected_display");
