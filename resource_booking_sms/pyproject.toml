@@ -1,7 +1,3 @@
-[project]
-name = "odoo-addon-resource-booking-sms"
-version = "18.0.1.0.0"
-
 [build-system]
 requires = ["whool"]
 build-backend = "whool.buildapi"
