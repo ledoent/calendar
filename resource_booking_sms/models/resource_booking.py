@@ -2,8 +2,8 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 import logging
-
-import pytz
+from datetime import UTC
+from zoneinfo import ZoneInfo
 
 from odoo import models
 
@@ -61,8 +61,12 @@ class ResourceBooking(models.Model):
         requester = self.partner_ids[:1].name or "Someone"
         start_str = ""
         if self.start:
-            tz_name = self.type_id.resource_calendar_id.tz or "UTC"
-            utc_dt = pytz.utc.localize(self.start)
-            local_dt = utc_dt.astimezone(pytz.timezone(tz_name))
+            # 20.0 removed resource.calendar.tz; the zone lives on the
+            # company. pytz is gone with it -- core imports it nowhere and it is
+            # not in requirements.txt -- so the localisation is stdlib zoneinfo,
+            # whose datetimes carry no .localize(). %Z still renders the
+            # abbreviation, so the message text is unchanged.
+            tz_name = self.type_id.resource_calendar_id.company_id.tz or "UTC"
+            local_dt = self.start.replace(tzinfo=UTC).astimezone(ZoneInfo(tz_name))
             start_str = local_dt.strftime("%B %d at %I:%M %p %Z")
         return f"New booking: {requester} booked {self.type_id.name} on {start_str}."

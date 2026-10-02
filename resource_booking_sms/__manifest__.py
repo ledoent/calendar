@@ -4,7 +4,7 @@
 {
     "name": "Resource Booking SMS",
     "summary": "Send SMS notifications to resource users on booking confirmation",
-    "version": "19.0.1.0.0",
+    "version": "20.0.1.0.0",
     "development_status": "Beta",
     "category": "Appointments",
     "website": "https://github.com/OCA/calendar",

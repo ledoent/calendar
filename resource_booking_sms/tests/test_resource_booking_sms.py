@@ -87,7 +87,12 @@ class TestResourceBookingSms(TransactionCase):
 
     def test_sms_body_localised_time(self):
         """The SMS body shows the start time in the calendar's timezone."""
-        self.rbt.resource_calendar_id.tz = "US/Eastern"
+        # 20.0 removed resource.calendar.tz and keeps one zone per COMPANY, so
+        # this moves the company's zone rather than this calendar's. The booking
+        # type's own calendar has no resource, and _get_intervals keys it on the
+        # company zone, so its 8-17 window is still what moves to EST; the
+        # combination's resources carry their own tz and are unaffected.
+        self.rbt.resource_calendar_id.company_id.tz = "US/Eastern"
         # Working hours (8-17) are now read in EST, so pick a UTC instant that
         # lands inside that window: 14:00 UTC == 09:00 EST.
         booking = self._create_scheduled_booking(start=datetime(2021, 3, 1, 14, 0, 0))
