@@ -1,0 +1,4 @@
+id,name,model_id,group_id/id,operation,domain
+website_appointment_booking_type_public,Public read on resource booking types,resource.booking.type,base.group_public,r,
+website_appointment_booking_combination_public,Public read on resource booking combinations,resource.booking.combination,base.group_public,r,
+website_appointment_booking_combination_rel_public,Public read on resource booking type combination relations,resource.booking.type.combination.rel,base.group_public,r,
