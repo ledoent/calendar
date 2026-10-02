@@ -238,7 +238,7 @@ class TestWebsiteAppointmentBooking(HttpCase):
         page = self._url_xml("/book/test-booking/2021/3")
         labels = page.cssselect("#o_wab_tz_label")
         self.assertTrue(labels)
-        resource_tz = self.rbt.resource_calendar_id.tz or "UTC"
+        resource_tz = self.rbt.resource_calendar_id.company_id.tz or "UTC"
         self.assertEqual(labels[0].text_content().strip(), resource_tz)
         calendar_root = page.cssselect(".o_wab_calendar")
         self.assertEqual(calendar_root[0].get("data-resource-tz"), resource_tz)
@@ -289,7 +289,7 @@ class TestWebsiteAppointmentBooking(HttpCase):
         page = self._url_xml("/book/test-booking/2021/3?tz=Etc/UTC%00malicious")
         calendar_root = page.cssselect(".o_wab_calendar")
         self.assertTrue(calendar_root)
-        resource_tz = self.rbt.resource_calendar_id.tz or "UTC"
+        resource_tz = self.rbt.resource_calendar_id.company_id.tz or "UTC"
         self.assertEqual(calendar_root[0].get("data-effective-tz"), resource_tz)
 
     def test_booking_page_accepts_pytz_alias(self):

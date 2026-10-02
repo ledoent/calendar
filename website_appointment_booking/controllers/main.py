@@ -4,9 +4,9 @@
 import json
 import logging
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-import pytz
 from dateutil.parser import isoparse
 from dateutil.relativedelta import relativedelta
 from werkzeug.exceptions import NotFound
@@ -43,19 +43,26 @@ class WebsiteAppointmentBooking(http.Controller):
 
     @staticmethod
     def _validate_tz(tz):
-        """Return ``tz`` if pytz can resolve it (incl. aliases), else None.
+        """Return ``tz`` if ZoneInfo can resolve it (incl. aliases), else None.
 
-        ``pytz.all_timezones_set`` only contains the canonical names —
-        modern browsers can emit deprecated-but-valid aliases like
-        ``Asia/Calcutta``, ``America/Buenos_Aires``, ``Etc/GMT+5`` which
-        membership tests reject. ``pytz.timezone()`` accepts them all,
-        so use it as the validity probe.
+        A membership test against canonical names is not enough: modern
+        browsers can emit deprecated-but-valid aliases like ``Asia/Calcutta``,
+        ``America/Buenos_Aires``, ``Etc/GMT+5``. Odoo patches zoneinfo to map
+        exactly those onto their canonical zones -- the names Ubuntu noble
+        dropped from tzdata -- in odoo/_monkeypatches/zoneinfo.py, so
+        constructing a ZoneInfo is the right validity probe and keeps the
+        tolerance pytz.timezone() used to provide.
+
+        ValueError is caught alongside the lookup failure because ZoneInfo
+        raises it, not ZoneInfoNotFoundError, for a key that is not a
+        normalized relative path -- an absolute path or one containing ``..``.
+        That is the hostile input, so it must not escape as a 500.
         """
         if not tz or not isinstance(tz, str):
             return None
         try:
-            pytz.timezone(tz)
-        except pytz.UnknownTimeZoneError:
+            ZoneInfo(tz)
+        except (ZoneInfoNotFoundError, ValueError):
             return None
         return tz
 
@@ -64,13 +71,18 @@ class WebsiteAppointmentBooking(http.Controller):
 
         Uses ``new()`` to avoid writing to the database. The phantom booking
         is configured with auto-assignment so that ``_get_available_slots``
-        considers all resource combinations. ``tz`` controls the bucketing
-        timezone for the calendar grid; if absent it falls back to the
-        booking type's resource calendar timezone.
+        considers all resource combinations.
+
+        ``tz`` sets the context timezone, which places the "not before now +
+        modifications_deadline" floor in the visitor's day. It does NOT decide
+        how slots are bucketed into days: the intervals come from the booking
+        type's own calendar, so the buckets are in that calendar's timezone --
+        ``res.company.tz`` on 20.0, where 19.0 read ``resource.calendar.tz``.
+        ``_serialize_slots`` is what re-buckets for the visitor.
         """
         Booking = request.env["resource.booking"].sudo()
         if tz is None:
-            tz = booking_type.resource_calendar_id.tz or "UTC"
+            tz = booking_type.resource_calendar_id.company_id.tz or "UTC"
         return Booking.with_context(tz=tz).new(
             {
                 "type_id": booking_type.id,
@@ -85,20 +97,20 @@ class WebsiteAppointmentBooking(http.Controller):
     ):
         """Are any of the padded slots in the visitor's local working hours?
 
-        Walks the slot list (which is already tz-aware, in
-        ``visitor_tz`` once the phantom booking is built with
-        ``with_context(tz=visitor_tz)``), and counts entries that fall
-        within ``hours_start``–``hours_end`` (visitor-local hours)
-        across the next ``days`` days from now.
+        Walks the slot list, whose entries are tz-aware instants in the
+        booking type's calendar timezone rather than the visitor's -- see
+        ``_create_phantom_booking`` -- and converts each one here, counting
+        entries that fall within ``hours_start``–``hours_end``
+        (visitor-local hours) across the next ``days`` days from now.
 
         Returns True as soon as one such slot is found; the loop bails
         early to keep this O(slots-until-first-match), not O(slots).
         """
         try:
-            tz = pytz.timezone(visitor_tz)
-        except pytz.UnknownTimeZoneError:
+            tz = ZoneInfo(visitor_tz)
+        except (ZoneInfoNotFoundError, ValueError):
             return True  # be conservative — never block when validation regresses
-        now = pytz.UTC.localize(datetime.utcnow()).astimezone(tz)
+        now = datetime.now(UTC).astimezone(tz)
         cutoff = now + timedelta(days=days)
         for day_slots in slots.values():
             for slot_dt in day_slots:
@@ -121,7 +133,7 @@ class WebsiteAppointmentBooking(http.Controller):
         tz views — that lets clients compare slot identity regardless of
         which view they're rendering.
         """
-        tz = pytz.timezone(effective_tz) if effective_tz else None
+        tz = ZoneInfo(effective_tz) if effective_tz else None
         result = []
         for day, times in sorted(slots.items()):
             for slot_dt in times:
@@ -131,7 +143,7 @@ class WebsiteAppointmentBooking(http.Controller):
                         {
                             "date": local.date().isoformat(),
                             "time": local.strftime(time_format),
-                            "iso": slot_dt.astimezone(pytz.UTC).isoformat(),
+                            "iso": slot_dt.astimezone(UTC).isoformat(),
                         }
                     )
                 else:
@@ -183,7 +195,7 @@ class WebsiteAppointmentBooking(http.Controller):
         booking_type = self._get_booking_type(slug)
         if not booking_type:
             raise NotFound()
-        resource_tz = booking_type.resource_calendar_id.tz or "UTC"
+        resource_tz = booking_type.resource_calendar_id.company_id.tz or "UTC"
         # ``?tz=`` overrides the bucketing timezone for the calendar grid.
         # Invalid values silently fall back to the resource tz.
         effective_tz = self._validate_tz(kwargs.get("tz")) or resource_tz
@@ -298,7 +310,7 @@ class WebsiteAppointmentBooking(http.Controller):
         # a ValidationError (race condition: slot already taken) can be
         # caught without poisoning the database cursor.
         Booking = request.env["resource.booking"].sudo()
-        resource_tz = booking_type.resource_calendar_id.tz or "UTC"
+        resource_tz = booking_type.resource_calendar_id.company_id.tz or "UTC"
         try:
             with request.env.cr.savepoint():
                 booking = Booking.with_context(
@@ -317,7 +329,7 @@ class WebsiteAppointmentBooking(http.Controller):
         except ValidationError:
             # Race condition: slot was taken between page load and submit.
             # The month-nav path is anchored to resource-tz months.
-            resource_when = when_tz_aware.astimezone(pytz.timezone(resource_tz))
+            resource_when = when_tz_aware.astimezone(ZoneInfo(resource_tz))
             month_str = f"{resource_when:%Y/%m}"
             return request.redirect(
                 f"/book/{slug}/{month_str}"
@@ -328,9 +340,7 @@ class WebsiteAppointmentBooking(http.Controller):
         # from submitting e.g. ``when=…+09:00`` to make the success page
         # show a misleading time.
         display_tz = self._validate_tz(kwargs.get("display_tz")) or resource_tz
-        display_dt = when_naive.replace(tzinfo=timezone.utc).astimezone(
-            pytz.timezone(display_tz)
-        )
+        display_dt = when_naive.replace(tzinfo=UTC).astimezone(ZoneInfo(display_tz))
         request.session["last_booking"] = {
             "name": booking_type.name,
             "start": display_dt.strftime("%B %d, %Y"),
@@ -381,12 +391,20 @@ class WebsiteAppointmentBooking(http.Controller):
         logged and swallowed: the user-visible flow must never block on
         a notification side-channel.
         """
+        # get_str, not get_param: 20.0 replaced ir.config_parameter's untyped
+        # get_param/set_param with typed accessors (get_str / get_bool / get_int
+        # / get_float and the set_* equivalents). get_param raises
+        # AttributeError, which here surfaced as a 500 on POST /book/<slug>/request
+        # -- the lead was created and only the notification leg failed, so
+        # nothing but an HTTP test of that route would have caught it. get_str
+        # returns '' where get_param returned False; both are falsy, so the
+        # "no topic configured -> silent no-op" guard below is unchanged.
         icp = request.env["ir.config_parameter"].sudo()
-        topic = icp.get_param("ntfy.topic")
+        topic = icp.get_str("ntfy.topic")
         if not topic:
             return
-        base = icp.get_param("ntfy.base_url", "https://ntfy.hz.ledoweb.com")
-        token = icp.get_param("ntfy.token")
+        base = icp.get_str("ntfy.base_url", "https://ntfy.hz.ledoweb.com")
+        token = icp.get_str("ntfy.token")
 
         # Strip CR/LF from any user-supplied text that flows into HTTP
         # headers so we don't get header injection via the visitor name.

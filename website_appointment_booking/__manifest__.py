@@ -4,7 +4,7 @@
 {
     "name": "Website Appointment Booking",
     "summary": "Public appointment booking pages for resource booking types",
-    "version": "19.0.1.0.0",
+    "version": "20.0.1.0.0",
     "development_status": "Beta",
     "category": "Appointments",
     "website": "https://github.com/OCA/calendar",
@@ -19,10 +19,10 @@
         "mail",
     ],
     "data": [
-        "security/ir.model.access.csv",
         "data/mail_templates.xml",
         "templates/booking.xml",
         "views/resource_booking_type_views.xml",
+        "security/ir.access.csv",
     ],
     "assets": {
         "web.assets_frontend": [

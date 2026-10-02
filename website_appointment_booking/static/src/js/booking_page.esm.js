@@ -4,22 +4,22 @@
 /**
  * Public booking page interactivity.
  *
- * Uses Odoo's publicWidget system so that the widget initializes correctly
- * with deferred/lazy asset loading in Odoo 19.  Reads slot data from a
- * hidden data attribute rendered server-side and handles day/slot
- * selection without additional network requests.
+ * Built on the Interaction framework, which replaced publicWidget: 20.0
+ * deleted @web/legacy/js/public/public_widget outright. Reads slot data from a
+ * hidden data attribute rendered server-side and handles day/slot selection
+ * without additional network requests.
  *
  * Timezone handling: slot ISO instants are absolute (carry an offset). The
  * server renders day-buckets and time strings in the booking type's
  * resource calendar timezone. If the visitor's browser timezone differs,
- * this widget re-buckets the slots into visitor-local days and reformats
+ * this interaction re-buckets the slots into visitor-local days and reformats
  * the time strings — entirely client-side, no round-trip. An optional
  * ``?tz=`` query param lets the server bucket in an explicit timezone
  * (overrides browser detection); a dropdown lets the visitor pick.
  */
 
-/* eslint-env browser */
-import publicWidget from "@web/legacy/js/public/public_widget";
+import {Interaction} from "@web/public/interaction";
+import {registry} from "@web/core/registry";
 
 /** Build an ``Intl.DateTimeFormat`` keyed in the given timezone. */
 function _dateFormatterFor(tz) {
@@ -52,15 +52,15 @@ function _detectBrowserTz() {
  * Out-of-hours request banner — the "Request a custom slot" CTA on the
  * booking page when the visitor's timezone has no overlap with the
  * published booking hours. Lives as a sibling of the main calendar
- * widget so its toggle state is independent.
+ * interaction so its toggle state is independent.
  */
-publicWidget.registry.WebsiteAppointmentRequestBanner = publicWidget.Widget.extend({
-    selector: ".o_wab_request_banner",
-    events: {
-        "click .o_wab_request_toggle": "_onToggle",
-    },
+export class WebsiteAppointmentRequestBanner extends Interaction {
+    static selector = ".o_wab_request_banner";
+    dynamicContent = {
+        ".o_wab_request_toggle": {"t-on-click": this.onToggle},
+    };
 
-    _onToggle(ev) {
+    onToggle(ev) {
         const form = this.el.querySelector("#o_wab_request_form");
         const toggleBtn = ev.currentTarget;
         if (!form) {
@@ -77,26 +77,50 @@ publicWidget.registry.WebsiteAppointmentRequestBanner = publicWidget.Widget.exte
         if (nameInput) {
             nameInput.focus();
         }
-    },
-});
+    }
+}
 
-publicWidget.registry.WebsiteAppointmentBooking = publicWidget.Widget.extend({
-    selector: ".o_wab_calendar",
-    events: {
-        "click .o_wab_day_available": "_onDayClick",
-        "keydown .o_wab_day_available": "_onDayKeydown",
-        "click .o_wab_slot_btn": "_onSlotClick",
-        "change #o_wab_tz_select": "_onTzSelectChange",
-        "toggle .o_wab_description details": "_onDetailsToggle",
-    },
+registry
+    .category("public.interactions")
+    .add("website_appointment_booking.request_banner", WebsiteAppointmentRequestBanner);
+
+export class WebsiteAppointmentBooking extends Interaction {
+    static selector = ".o_wab_calendar";
+    dynamicContent = {
+        // Bound on .o_wab_day[data-date], NOT on .o_wab_day_available, even
+        // though availability is what the handler cares about. publicWidget's
+        // `events` map was delegated on the root, so its selector was
+        // re-evaluated at event time and a cell that *gained* availability
+        // later was still clickable. Colibri binds listeners directly to the
+        // nodes matching each selector (colibri.js addListener), so a mutated
+        // class is not picked up until the next updateContent() -- and
+        // refreshNodes() is gated on hasStarted, which is only set AFTER
+        // start() returns. _rebucketSlots adds o_wab_day_available to cells, so
+        // binding on that class would leave every re-bucketed day silently
+        // dead for a visitor outside the resource's timezone. The day cells
+        // themselves are server-rendered and never added or removed, so
+        // binding on them is stable; the handler checks availability instead.
+        ".o_wab_day[data-date]": {
+            "t-on-click": this.onDayClick,
+            "t-on-keydown": this.onDayKeydown,
+        },
+        // These buttons ARE created at runtime by onDayClick. That works
+        // because Colibri calls updateContent() after every t-on handler
+        // returns, and updateContent -> refreshNodes binds the new nodes.
+        ".o_wab_slot_btn": {"t-on-click": this.onSlotClick},
+        "#o_wab_tz_select": {"t-on-change": this.onTzSelectChange},
+    };
 
     /**
-     * @override
+     * Init runs in setup(), not start(): startInteraction() processes
+     * dynamicContent and binds listeners BEFORE calling start()
+     * (colibri.js startInteraction), so any DOM this method changes has to be
+     * settled first for the bindings to see it.
      */
-    start() {
+    setup() {
         const dataEl = this.el.querySelector("#o_wab_slot_data");
         if (!dataEl) {
-            return this._super(...arguments);
+            return;
         }
         this.allSlots = JSON.parse(dataEl.dataset.slots || "[]");
         this.panel = this.el.querySelector("#o_wab_slots_panel");
@@ -144,8 +168,7 @@ publicWidget.registry.WebsiteAppointmentBooking = publicWidget.Widget.extend({
                 slot
             );
         }
-        return this._super(...arguments);
-    },
+    }
 
     // -------------------------------------------------------------------------
     // Timezone re-bucketing
@@ -202,7 +225,7 @@ publicWidget.registry.WebsiteAppointmentBooking = publicWidget.Widget.extend({
                 cell.removeAttribute("tabindex");
             }
         }
-    },
+    }
 
     _updateTzLabel(tz) {
         if (this.tzLabel) {
@@ -211,7 +234,7 @@ publicWidget.registry.WebsiteAppointmentBooking = publicWidget.Widget.extend({
         if (this.tzSecondary && tz !== this.resourceTz) {
             this.tzSecondary.classList.remove("d-none");
         }
-    },
+    }
 
     _ensureOptionPresent(select, value) {
         if (!value) {
@@ -225,18 +248,20 @@ publicWidget.registry.WebsiteAppointmentBooking = publicWidget.Widget.extend({
             // Insert at the top so it's the first thing users see.
             select.insertBefore(opt, select.firstChild);
         }
-    },
+    }
 
     // -------------------------------------------------------------------------
     // Handlers
     // -------------------------------------------------------------------------
 
     /**
-     * Handle click on an available calendar day.
+     * Handle click on an available calendar day. Unavailable days are bound
+     * too (see dynamicContent) and fall out on the slot lookup below, which is
+     * what the delegated ``.o_wab_day_available`` selector used to do.
      *
      * @param {Event} ev
      */
-    _onDayClick(ev) {
+    onDayClick(ev) {
         const td = ev.currentTarget;
         const date = td.dataset.date;
         if (!date) {
@@ -312,26 +337,26 @@ publicWidget.registry.WebsiteAppointmentBooking = publicWidget.Widget.extend({
         if (this.panel) {
             this.panel.scrollIntoView({behavior: "smooth", block: "nearest"});
         }
-    },
+    }
 
     /**
      * Keyboard activation on day cells — Enter or Space mirrors a click.
      *
      * @param {KeyboardEvent} ev
      */
-    _onDayKeydown(ev) {
+    onDayKeydown(ev) {
         if (ev.key === "Enter" || ev.key === " ") {
             ev.preventDefault();
-            this._onDayClick(ev);
+            this.onDayClick(ev);
         }
-    },
+    }
 
     /**
      * Handle click on a time slot button.
      *
      * @param {Event} ev
      */
-    _onSlotClick(ev) {
+    onSlotClick(ev) {
         const btn = ev.currentTarget;
 
         // Highlight selected slot
@@ -353,7 +378,7 @@ publicWidget.registry.WebsiteAppointmentBooking = publicWidget.Widget.extend({
             this.form.classList.remove("d-none");
             this.form.scrollIntoView({behavior: "smooth", block: "nearest"});
         }
-    },
+    }
 
     /**
      * Tz dropdown change — reload with ``?tz=<value>`` so the server
@@ -362,15 +387,7 @@ publicWidget.registry.WebsiteAppointmentBooking = publicWidget.Widget.extend({
      *
      * @param {Event} ev
      */
-    _onDetailsToggle(ev) {
-        const opened = ev.currentTarget;
-        if (!opened.open) return;
-        this.el.querySelectorAll(".o_wab_description details").forEach((d) => {
-            if (d !== opened) d.removeAttribute("open");
-        });
-    },
-
-    _onTzSelectChange(ev) {
+    onTzSelectChange(ev) {
         const tz = ev.currentTarget.value;
         if (!tz) {
             return;
@@ -378,5 +395,9 @@ publicWidget.registry.WebsiteAppointmentBooking = publicWidget.Widget.extend({
         const url = new URL(window.location.href);
         url.searchParams.set("tz", tz);
         window.location.assign(url.toString());
-    },
-});
+    }
+}
+
+registry
+    .category("public.interactions")
+    .add("website_appointment_booking.booking_page", WebsiteAppointmentBooking);
