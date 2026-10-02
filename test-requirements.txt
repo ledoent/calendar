@@ -1,0 +1,6 @@
+# DO NOT MERGE — temporary pins until these land and their wheels ship.
+# The whole unreleased closure has to be listed, not just the direct dependency:
+# CI resolves wheels, so it reads resource_booking's own pyproject.toml and
+# tries PyPI for web_calendar_slot_duration, which has no 20.0 release either.
+odoo-addon-resource_booking @ git+https://github.com/ledoent/calendar.git@20.0-mig-resource_booking#subdirectory=resource_booking
+odoo-addon-web_calendar_slot_duration @ git+https://github.com/ledoent/web.git@20.0-mig-web_calendar_slot_duration#subdirectory=web_calendar_slot_duration
