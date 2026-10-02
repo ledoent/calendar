@@ -1,0 +1,13 @@
+id,name,model_id,group_id/id,operation,domain
+resource_booking_combination_user,Permission to read resource booking combinations,resource.booking.combination,resource_booking.group_user,r,
+resource_booking_combination_manager,Permission to write resource booking combinations,resource.booking.combination,resource_booking.group_manager,crud,
+resource_booking_type_user,Permission to read resource booking types,resource.booking.type,resource_booking.group_user,r,
+resource_booking_type_manager,Permission to write resource booking types,resource.booking.type,resource_booking.group_manager,crud,
+rule_resource_booking_type_company,Resource booking type multi company rule,resource.booking.type,,crud,"[('company_id', 'in', company_ids + [False])]"
+rule_resource_booking_portal,Resource booking portal rule,resource.booking,base.group_portal,r,"['|', ('partner_ids', 'child_of', user.partner_id.ids), ('message_partner_ids', 'child_of', user.partner_id.ids)]"
+rule_resource_booking_user,Resource booking user rule,resource.booking,resource_booking.group_user,cru,"['|', '|', ('partner_ids', 'child_of', user.partner_id.ids), ('message_partner_ids', 'child_of', user.partner_id.ids), ('combination_id.resource_ids.user_id', 'in', user.ids)]"
+rule_resource_booking_manager,Resource booking manager rule,resource.booking,resource_booking.group_manager,crud,
+rule_resource_booking_company,Resource booking multi company rule,resource.booking,,crud,"[('type_id.company_id', 'in', company_ids + [False])]"
+resource_resource_manager,Permission to write resources,resource.resource,resource_booking.group_manager,crud,
+resource_booking_type_combination_rel_user,Permission to read resource booking type combination relations for users,resource.booking.type.combination.rel,resource_booking.group_user,r,
+resource_booking_type_combination_rel_manager,Permission to read resource booking type combination relations for managers,resource.booking.type.combination.rel,resource_booking.group_manager,crud,
