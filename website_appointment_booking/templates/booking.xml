@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <!-- Copyright 2025 Ledo Enterprises LLC - Don Kendall
      License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl). -->
 <odoo>
@@ -109,9 +109,9 @@
 
                                 <form
                                     id="o_wab_request_form"
+                                    class="o_wab_request_form d-none mt-4"
                                     method="post"
                                     t-attf-action="/book/#{booking_type.website_slug}/request"
-                                    class="o_wab_request_form d-none mt-4"
                                 >
                                     <input
                                         type="hidden"
@@ -130,9 +130,9 @@
                                                 class="form-label"
                                             >Name *</label>
                                             <input
-                                                type="text"
-                                                class="form-control"
                                                 id="o_wab_request_name"
+                                                class="form-control"
+                                                type="text"
                                                 name="name"
                                                 required="required"
                                                 placeholder="Your full name"
@@ -144,9 +144,9 @@
                                                 class="form-label"
                                             >Email *</label>
                                             <input
-                                                type="email"
-                                                class="form-control"
                                                 id="o_wab_request_email"
+                                                class="form-control"
+                                                type="email"
                                                 name="email"
                                                 required="required"
                                                 placeholder="you@example.com"
@@ -159,9 +159,9 @@
                                             class="form-label"
                                         >Preferred 2-hour window (in your timezone)</label>
                                         <input
-                                            type="text"
-                                            class="form-control"
                                             id="o_wab_request_window"
+                                            class="form-control"
+                                            type="text"
                                             name="preferred_window"
                                             placeholder="e.g. Tue / Thu 09:00–11:00 NZST"
                                         />
@@ -172,8 +172,8 @@
                                             class="form-label"
                                         >Anything else we should know?</label>
                                         <textarea
-                                            class="form-control"
                                             id="o_wab_request_note"
+                                            class="form-control"
                                             name="note"
                                             rows="2"
                                             placeholder="Optional context — what you'd like to discuss, project specifics, etc."
@@ -396,8 +396,8 @@
 
                                     <!-- Hidden slot data for JS -->
                                     <div
-                                        class="d-none"
                                         id="o_wab_slot_data"
+                                        class="d-none"
                                         t-att-data-slots="slot_data_json"
                                     />
                                 </t>
@@ -445,9 +445,9 @@
                                                     class="form-label"
                                                 >Name</label>
                                                 <input
-                                                    type="text"
-                                                    class="form-control"
                                                     id="o_wab_name"
+                                                    class="form-control"
+                                                    type="text"
                                                     name="name"
                                                     required="required"
                                                     placeholder="Your full name"
@@ -459,9 +459,9 @@
                                                     class="form-label"
                                                 >Email</label>
                                                 <input
-                                                    type="email"
-                                                    class="form-control"
                                                     id="o_wab_email"
+                                                    class="form-control"
+                                                    type="email"
                                                     name="email"
                                                     required="required"
                                                     placeholder="you@example.com"
