@@ -20,7 +20,11 @@ class CalendarAttendee(models.Model):
         res = super()._compute_mail_tz()
         for attendee in self:
             booking = attendee.event_id.sudo().resource_booking_ids
-            booking_tz = booking.type_id.resource_calendar_id.tz
+            # 20.0 removed resource.calendar.tz; the timezone now lives on the
+            # company (res.company.tz, added to the resource module and computed
+            # from its country). Core reads it the same way, e.g.
+            # resource_calendar_leaves.py: `self.company_id.tz or 'UTC'`.
+            booking_tz = booking.type_id.resource_calendar_id.company_id.tz
             if booking_tz:
                 attendee.mail_tz = booking_tz
         return res

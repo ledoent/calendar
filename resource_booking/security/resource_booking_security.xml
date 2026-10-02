@@ -1,7 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<!-- Copyright 2021 Tecnativa - Jairo Llopis
-     Copyright 2023 Tecnativa - Carolina Fernandez
-     License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl). -->
+<?xml version="1.0" encoding="UTF-8" ?>
 <data>
     <record id="category_resource_booking" model="ir.module.category">
         <field name="name">Resource Booking</field>
@@ -21,46 +18,4 @@
             eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"
         />
     </record>
-    <data noupdate="1">
-        <record id="rule_resource_booking_type_company" model="ir.rule">
-            <field name="name">Resource booking type multi company rule</field>
-            <field name="model_id" ref="model_resource_booking_type" />
-            <field name="global" eval="True" />
-            <field
-                name="domain_force"
-            >[('company_id', 'in', company_ids + [False])]</field>
-        </record>
-
-        <record id="rule_resource_booking_company" model="ir.rule">
-            <field name="name">Resource booking multi company rule</field>
-            <field name="model_id" ref="model_resource_booking" />
-            <field name="global" eval="True" />
-            <field
-                name="domain_force"
-            >[('type_id.company_id', 'in', company_ids + [False])]</field>
-        </record>
-
-        <record id="rule_resource_booking_portal" model="ir.rule">
-            <field name="name">Resource booking portal rule</field>
-            <field name="model_id" ref="model_resource_booking" />
-            <field name="groups" eval="[(4, ref('base.group_portal'))]" />
-            <field
-                name="domain_force"
-            >['|', ('partner_ids', 'child_of', user.partner_id.ids), ('message_partner_ids', 'child_of', user.partner_id.ids)]</field>
-        </record>
-        <record id="rule_resource_booking_user" model="ir.rule">
-            <field name="name">Resource booking user rule</field>
-            <field name="model_id" ref="model_resource_booking" />
-            <field name="groups" eval="[(4, ref('group_user'))]" />
-            <field
-                name="domain_force"
-            >['|', '|', ('partner_ids', 'child_of', user.partner_id.ids), ('message_partner_ids', 'child_of', user.partner_id.ids), ('combination_id.resource_ids.user_id', 'in', user.ids)]</field>
-        </record>
-        <record id="rule_resource_booking_manager" model="ir.rule">
-            <field name="name">Resource booking manager rule</field>
-            <field name="model_id" ref="model_resource_booking" />
-            <field name="groups" eval="[(4, ref('group_manager'))]" />
-            <field name="domain_force">[(1, '=', 1)]</field>
-        </record>
-    </data>
 </data>

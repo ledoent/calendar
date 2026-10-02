@@ -1,6 +1,8 @@
 # Copyright 2021 Tecnativa - Jairo Llopis
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+from zoneinfo import ZoneInfo
+
 from odoo import api, fields, models
 from odoo.tools.intervals import Intervals
 
@@ -92,10 +94,19 @@ class ResourceBookingCombination(models.Model):
                 calendar = combination.forced_calendar_id or res.calendar_id
                 # combination_intervals &= calendar._work_intervals(start_dt,
                 # end_dt, res)
+                # Keyed by the RESOURCE's timezone, not the caller's: core
+                # localizes hour_from/hour_to in whatever tz the key carries, and
+                # 19.0 resolved it as `timezone(resource.tz)`. Passing
+                # start_dt.tzinfo silently treats an America/Guayaquil resource
+                # as a caller-tz one.
                 combination_intervals_in_tz = calendar._work_intervals_batch(
-                    start_dt, end_dt, res
+                    start_dt, end_dt, res._get_resources_per_tz()
                 )[res.id]
-                if tz and calendar.tz != tz.zone:
+                # Both sides normalised through ZoneInfo: .key resolves a tzdata
+                # link to its target, so ZoneInfo("US/Eastern").key is
+                # "America/New_York". Comparing the raw field against it reports
+                # two spellings of one zone as different.
+                if tz and ZoneInfo(res.tz).key != tz.key:
                     new_intervals = []
                     for interval in combination_intervals_in_tz:
                         start = interval[0].astimezone(tz)

@@ -2,9 +2,7 @@
 # Copyright 2022 Tecnativa - Pedro M. Baeza
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
-from datetime import datetime, time, timedelta
-
-from pytz import UTC
+from datetime import UTC, datetime, time, timedelta
 
 from odoo import api, fields, models
 from odoo.fields import Domain
@@ -18,7 +16,7 @@ class Busy(Exception):
 class ResourceCalendar(models.Model):
     _inherit = "resource.calendar"
 
-    @api.constrains("attendance_ids", "global_leave_ids", "leave_ids", "tz")
+    @api.constrains("attendance_ids", "global_leave_ids", "leave_ids")
     def _check_bookings_scheduling(self):
         """Scheduled bookings must have no conflicts."""
         bookings = (
@@ -111,12 +109,16 @@ class ResourceCalendar(models.Model):
                 # have no start/stop timestamps in some flows, so derive the
                 # interval from start_date/stop_date in the analyzer's tz.
                 if event.allday and event.start_date and event.stop_date:
-                    event_start = interval_tz.localize(
-                        datetime.combine(event.start_date, time.min)
+                    # 20.0 moved the ORM from pytz to stdlib zoneinfo, so
+                    # tzinfo is a ZoneInfo and .localize() no longer exists.
+                    # .replace(tzinfo=...) is correct for zoneinfo (DST is
+                    # resolved lazily) and is what core does itself.
+                    event_start = datetime.combine(event.start_date, time.min).replace(
+                        tzinfo=interval_tz
                     )
-                    event_stop = interval_tz.localize(
-                        datetime.combine(event.stop_date + timedelta(days=1), time.min)
-                    )
+                    event_stop = datetime.combine(
+                        event.stop_date + timedelta(days=1), time.min
+                    ).replace(tzinfo=interval_tz)
                 else:
                     event_start = fields.Datetime.context_timestamp(
                         event, fields.Datetime.to_datetime(event.start)
@@ -134,10 +136,19 @@ class ResourceCalendar(models.Model):
         return Intervals(intervals)
 
     def _leave_intervals_batch(
-        self, start_dt, end_dt, resources=None, domain=None, tz=None
+        self, start_dt, end_dt, resources_per_tz=None, domain=None
     ):
-        """Count busy meetings as leaves if required by context."""
-        result = super()._leave_intervals_batch(start_dt, end_dt, resources, domain, tz)
+        """Count busy meetings as leaves if required by context.
+
+        20.0 reshaped this API: the `resources` recordset plus a single `tz`
+        became one `resources_per_tz` mapping {tzinfo: resources}, because a
+        timezone is now a property of each resource rather than of the calendar
+        (resource.calendar.tz was removed). The body is unchanged -- the result
+        is still keyed by resource id.
+        """
+        result = super()._leave_intervals_batch(
+            start_dt, end_dt, resources_per_tz, domain
+        )
         if self.env.context.get("analyzing_booking"):
             for resource_id in result:
                 # TODO Make this work in batch too

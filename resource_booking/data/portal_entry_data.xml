@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <!--
+        20.0 rebuilt the portal home around portal.entry records. The old
+        mechanism, inheriting portal.portal_my_home and injecting a
+        portal.portal_docs_entry into the div#portal_common_category anchor, has
+        no equivalent: the anchor is gone, so the inheriting template failed to
+        load with "Element '<div id="portal_common_category">' cannot be located
+        in parent view" and took the whole module install down.
+
+        placeholder_count still resolves the same way, through the controller's
+        _prepare_home_portal_values, so booking_count needs no change.
+    -->
+    <record id="portal_resource_booking" model="portal.entry">
+        <field name="name">Bookings</field>
+        <field name="description">View and manage your bookings</field>
+        <field name="url">/my/bookings</field>
+        <field
+            name="image"
+            type="bytes"
+            file="resource_booking/static/src/img/portal_icon.svg"
+        />
+        <field name="placeholder_count">booking_count</field>
+        <field name="category">common_category</field>
+    </record>
+</odoo>

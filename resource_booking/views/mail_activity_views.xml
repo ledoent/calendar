@@ -1,4 +1,4 @@
-<?xml version="1.0" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
     <record id="mail_activity_view_form_popup" model="ir.ui.view">
         <field name="name">mail.activity.form.inherit.booking</field>
@@ -20,10 +20,19 @@
                     name="invisible"
                 >activity_category in ['resource_booking','meeting'] or id</attribute>
             </xpath>
+            <!--
+                `chaining_type` was dropped from mail.activity in 20.0, and with
+                it core's own `chaining_type == 'trigger'` guard on this button
+                (20.0 ships Mark Done with no invisible at all). Referencing the
+                field here is not merely dead: view validation rejects the whole
+                file with "field chaining_type does not exist in model
+                mail.activity", which fails the module install. Keep only this
+                module's own condition.
+            -->
             <xpath expr="//button[@name='action_done']" position="attributes">
                 <attribute
                     name="invisible"
-                >activity_category in ['resource_booking','meeting'] or chaining_type == 'trigger'</attribute>
+                >activity_category in ['resource_booking','meeting']</attribute>
             </xpath>
             <xpath expr="//field[@name='note']" position="attributes">
                 <attribute

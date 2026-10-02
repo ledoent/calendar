@@ -5,9 +5,9 @@
 
 import calendar
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from dateutil.relativedelta import relativedelta
-from pytz import timezone
 
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
@@ -416,7 +416,7 @@ class ResourceBooking(models.Model):
                         meeting = meeting.with_context(from_ui=True)
                     meeting.write(meeting_vals)
                 else:
-                    event_tz = one.type_id.resource_calendar_id.tz or False
+                    event_tz = one.type_id.resource_calendar_id.company_id.tz or False
                     if event_tz:
                         meeting_vals["event_tz"] = event_tz
                     to_create.append(meeting_vals)
@@ -504,9 +504,20 @@ class ResourceBooking(models.Model):
         weekday_names = dict(lang.fields_get(["week_start"])["week_start"]["selection"])
         booking_duration = timedelta(hours=self.duration)
         slots = self._get_available_slots(start, start + month1 + booking_duration)
+        # The grids are built here rather than passed as a calendar.Calendar for
+        # the template to call. 20.0 inspects every call made from a QWeb
+        # expression against safe_eval's whitelist, and an arbitrary stdlib
+        # instance is not on it: calendar.iterweekdays() and
+        # calendar.monthdatescalendar() each logged "Unsafe function access" on
+        # every portal render, and raise UnsafeFunctionError outright under
+        # --unsafe-policy=raise. That exception derives from BaseException, so it
+        # passes straight through the controller's handlers. Lists of
+        # datetime.date are whitelisted (runtime.py:740) and need no call at all.
+        cal = calendar.Calendar(int(lang.week_start) - 1)
         return {
             "booking": self,
-            "calendar": calendar.Calendar(int(lang.week_start) - 1),
+            "weekdays": list(cal.iterweekdays()),
+            "month_weeks": cal.monthdatescalendar(start.year, start.month),
             "now": now,
             "res_lang": lang,
             "slots": slots,
@@ -595,10 +606,25 @@ class ResourceBooking(models.Model):
         booking = self.with_context(
             analyzing_booking=booking_id, exclude_public_holidays=True
         )
+        # The zone the booking type's working hours are expressed in. 19.0 read
+        # it off the calendar; 20.0 removed resource.calendar.tz and keeps it on
+        # the company. `or 'UTC'`: res.company.tz is nullable where the old
+        # calendar field effectively was not.
+        tz = ZoneInfo(self.type_id.resource_calendar_id.company_id.tz or "UTC")
         # RBT calendar uses no resources to restrict bookings
         if booking.type_id:
+            # The tz has to be passed, not just computed. 20.0 localises
+            # hour_from/hour_to in the zone of the resources_per_tz key and, when
+            # none is given, falls back to `{start_dt.tzinfo: <no resource>}`
+            # (resource_calendar.py _attendance_intervals_batch). This call has no
+            # resource, so without an explicit key a 09:00-18:00 calendar is read
+            # in whatever zone the CALLER is in rather than its own -- and the
+            # caller here is a portal request or a cron, not a person in the
+            # company's zone. res.company.tz is deliberately NOT consulted by
+            # that fallback, so relying on it silently reads every booking
+            # type's hours as UTC.
             result = booking.type_id.resource_calendar_id._work_intervals_batch(
-                start_dt, end_dt
+                start_dt, end_dt, {tz: self.env["resource.resource"]}
             )[False]
         else:
             result = Intervals([])
@@ -609,7 +635,6 @@ class ResourceBooking(models.Model):
             or booking.combination_id
             or booking.mapped("type_id.combination_rel_ids.combination_id")
         ).with_context(analyzing_booking=booking_id)
-        tz = timezone(self.type_id.resource_calendar_id.tz)
         result &= combinations._get_intervals(start_dt, end_dt, tz)
         return result
 

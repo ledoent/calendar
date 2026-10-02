@@ -44,7 +44,10 @@ class MailActivity(models.Model):
 
     def _action_done(self, feedback=False, attachment_ids=False):
         bookings = self.mapped("booking_id")
-        messages, activities = super()._action_done(
+        # 20.0 returns only the posted messages, where 19.0 returned
+        # (messages, next_activities) -- mail_activity.py:687,752 and its caller
+        # action_feedback, which now does `messages[0].id if messages else False`.
+        messages = super()._action_done(
             feedback=feedback, attachment_ids=attachment_ids
         )
         if feedback:
@@ -60,4 +63,4 @@ class MailActivity(models.Model):
                     else "",
                 )
                 booking.write({"description": description})
-        return messages, activities
+        return messages
