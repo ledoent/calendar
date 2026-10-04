@@ -540,6 +540,12 @@ class ResourceBooking(models.Model):
             available_intervals = self._get_intervals(start_dt, end_dt, combination)
             if _availability_is_fitting(available_intervals, start_dt, end_dt):
                 return combination
+        # A booking that already ended keeps the combination it was held with.
+        # Its resources are no longer required to be free -- _check_scheduling()
+        # exempts past bookings for the same reason -- so neither emptying the
+        # field nor refusing to read it is right.
+        if self.stop and self.stop < fields.Datetime.now():
+            return self.combination_id
         # Tell portal user there's no combination available
         if self.env.context.get("using_portal"):
             hours = (self.stop - self.start).total_seconds() / 3600
