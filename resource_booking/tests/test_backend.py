@@ -583,6 +583,67 @@ class BackendCaseMisc(BackendCaseBase):
         with self.assertRaises(ValidationError), self.env.cr.savepoint():
             future_booking.action_confirm()
 
+    def test_past_booking_keeps_its_combination_when_recomputed(self):
+        """A booking that already happened must not be re-validated.
+
+        `combination_id` is a stored compute over `start`, so anything that
+        makes the ORM recompute it re-runs the availability search -- against
+        today's calendars, however long ago the meeting was. For a past
+        booking that search finds nothing, and the answer used to be either an
+        emptied field or, for a portal reader, a raise. Both are wrong: the
+        resources were held and the meeting took place.
+
+        Found on production, where `/my/bookings` answered 422 on a list whose
+        only fault was that every booking in it was in the past, so one
+        historical row took the whole page down.
+
+        `_check_scheduling` has always exempted past bookings -- it is why
+        narrowing cal_mon below is permitted at all. The future slot keeps
+        raising, and PortalCase.test_portal_scheduling_conflict is what holds
+        that down.
+        """
+        # Leave the type with only the Mondays combination, so narrowing that
+        # one calendar below leaves the search with nothing to find.
+        self.rbt.combination_rel_ids[1:].unlink()
+        rbc_mon = self.rbcs[0]
+        cal_mon = self.r_calendars[0]
+        past_booking = self.env["resource.booking"].create(
+            {
+                "combination_id": rbc_mon.id,
+                "partner_ids": [Command.link(self.partner.id)],
+                "start": "2021-02-22 08:00:00",
+                "type_id": self.rbt.id,
+            }
+        )
+        past_booking.action_confirm()
+        # Monday mornings stop being bookable. Allowed, because the only
+        # booking affected is in the past.
+        cal_mon.attendance_ids.hour_from = 9
+        localize = fields.Datetime.context_timestamp
+        start_dt = localize(past_booking, past_booking.start)
+        stop_dt = localize(past_booking, past_booking.stop)
+        # Phrased over every combination the type offers, which is what
+        # _get_best_combination walks -- asserting on the booking's own
+        # combination alone would pass while a second one still fitted.
+        self.assertFalse(
+            any(
+                _availability_is_fitting(
+                    past_booking._get_intervals(start_dt, stop_dt, combination),
+                    start_dt,
+                    stop_dt,
+                )
+                for combination in self.rbt.combination_rel_ids.combination_id
+            ),
+            "test precondition: no combination the type offers may still fit",
+        )
+        # What the portal list page does: read the field with a recompute due.
+        portal_booking = past_booking.with_context(using_portal=True)
+        portal_booking.modified(["start"])
+        self.assertEqual(portal_booking.combination_id, rbc_mon)
+        # And the backend, which got no raise but lost the value instead.
+        past_booking.modified(["start"])
+        self.assertEqual(past_booking.combination_id, rbc_mon)
+
     def test_free_slots_with_different_type_and_booking_durations(self):
         """Slot and booking duration are different, and all works."""
         # Type and calendar allow one slot each 30 minutes on Mondays and
