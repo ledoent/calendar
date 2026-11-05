@@ -1,5 +1,3 @@
-# website_appointment_booking_crm — design notes
-
 ## Purpose
 
 Glue between the public booking page and CRM: visitors whose working hours never overlap
