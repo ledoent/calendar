@@ -105,12 +105,7 @@ Once a booking type is published:
 2. Visitors see a monthly calendar with available days highlighted, in
    their own timezone; a dropdown lets them display another one.
 3. Clicking a day reveals the available time slots for that day.
-4. Clicking a time slot shows a simple form asking for name and email,
-   and optionally company and phone. They are saved on the visitor's
-   contact; an existing contact only gets the ones it lacks. The visitor
-   can also say what they want to discuss: the text is kept as the
-   booking's description and added to the meeting description, after the
-   type's advice.
+4. Clicking a time slot shows a simple form asking for name and email.
 5. Upon confirmation, a ``resource.booking`` record is created and
    confirmed automatically, and calendar invitations are sent to both
    parties. The meeting organizer is the assigned resource's user.
@@ -140,13 +135,6 @@ Model
   the platform ``slugify`` on create/write so a hand-typed value is
   URL-safe. It is unique (SQL constraint) and mandatory to publish
   (Python constraint).
-- ``resource.booking._prepare_meeting_vals``: under the context key
-  ``website_appointment_booking_notes``, set by the confirm route, the
-  meeting description is the type's advice followed by the booking's
-  description (the visitor's notes, escaped with ``plaintext2html``).
-  Other bookings keep the advice only, since their description may hold
-  internal text. A meeting created again later, from the back office,
-  has the advice only.
 
 Controller
 ----------
@@ -194,9 +182,8 @@ Extension points
   (tz-aware slots with one day of padding) is exposed for them.
 - ``_get_error_message(code)``: extend the code → message map.
 - ``_check_submission(kwargs, action)``,
-  ``_get_or_create_partner(name, email, company=None, phone=None)`` and
-  ``_get_optional_contact_values(kwargs)`` (the trimmed ``company`` and
-  ``phone`` inputs): reusable by other public forms of the page.
+  ``_get_or_create_partner(name, email)``: reusable by other public
+  forms of the page.
 - Template anchors: ``.o_wab_alerts_row`` (error alert) and
   ``.o_wab_calendar_row`` (calendar block) for ``xpath`` insertions;
   ``booking_form_guard`` for the hidden fields any new form must
