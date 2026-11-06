@@ -14,7 +14,7 @@ from werkzeug.exceptions import NotFound
 from odoo import SUPERUSER_ID, http
 from odoo.exceptions import ValidationError
 from odoo.http import request
-from odoo.tools.mail import email_normalize
+from odoo.tools.mail import email_normalize, plaintext2html
 
 _logger = logging.getLogger(__name__)
 
@@ -23,6 +23,10 @@ _logger = logging.getLogger(__name__)
 HONEYPOT_FIELD = "company_website"
 # reCAPTCHA v3 action name; the token sent by the page must carry the same one.
 RECAPTCHA_ACTION = "website_appointment_booking"
+# Longest company name and phone kept from the optional inputs of the forms.
+COMPANY_MAX_LENGTH = 128
+PHONE_MAX_LENGTH = 32
+NOTES_MAX_LENGTH = 2000
 
 
 def sitemap_booking(env, rule, qs):
@@ -108,19 +112,47 @@ class WebsiteAppointmentBooking(http.Controller):
             return "rejected"
         return None
 
-    def _get_or_create_partner(self, name, email):
+    def _get_optional_contact_values(self, kwargs):
+        """Company and phone a visitor may give in a public form."""
+        return {
+            "company": (kwargs.get("company") or "").strip()[:COMPANY_MAX_LENGTH],
+            "phone": (kwargs.get("phone") or "").strip()[:PHONE_MAX_LENGTH],
+        }
+
+    def _get_or_create_partner(self, name, email, company=None, phone=None):
         """Reuse the contact with that email or create it.
 
         A pre-existing contact only gets its name filled when it has none
-        (or the email was used as name), so a visitor cannot rename someone
-        else's contact by reusing their address.
+        (or the email was used as name), and its company name and phone when
+        they are empty, so a visitor cannot overwrite someone else's contact
+        by reusing their address. The company is kept as the contact's
+        company name: a public form never creates a company record.
         """
         Partner = request.env["res.partner"].sudo()
         partner = Partner.search([("email", "=ilike", email)], limit=1)
         if not partner:
-            partner = Partner.create({"name": name, "email": email})
-        elif not partner.name or partner.name == email:
-            partner.name = name
+            return Partner.create(
+                {
+                    "name": name,
+                    "email": email,
+                    "company_name": company or False,
+                    "phone": phone or False,
+                }
+            )
+        vals = {}
+        if not partner.name or partner.name == email:
+            vals["name"] = name
+        if (
+            company
+            and not partner.company_name
+            and not partner.parent_id
+            and not partner.is_company
+        ):
+            vals["company_name"] = company
+        if phone and not partner.phone:
+            vals["phone"] = phone
+        if vals:
+            partner.write(vals)
         return partner
 
     def _create_phantom_booking(self, booking_type, tz=None):
@@ -284,6 +316,7 @@ class WebsiteAppointmentBooking(http.Controller):
         name = (kwargs.get("name") or "").strip()
         email = (kwargs.get("email") or "").strip()
         when_str = kwargs.get("when", "")
+        notes = (kwargs.get("notes") or "").strip()[:NOTES_MAX_LENGTH]
         if not name or not email or not when_str:
             return self._redirect_error(slug, "missing_fields")
         email = email_normalize(email)
@@ -304,7 +337,9 @@ class WebsiteAppointmentBooking(http.Controller):
         month_path = f"/{resource_when.year}/{resource_when.month}"
         if not self._is_available_slot(booking_type, when_naive):
             return self._redirect_error(slug, "slot_taken", month_path)
-        partner = self._get_or_create_partner(name, email)
+        partner = self._get_or_create_partner(
+            name, email, **self._get_optional_contact_values(kwargs)
+        )
         # Create and schedule the booking inside a savepoint so that a
         # ValidationError (race: slot taken between page load and submit)
         # can be caught without poisoning the database cursor.
@@ -315,6 +350,7 @@ class WebsiteAppointmentBooking(http.Controller):
                     tz=resource_tz,
                     using_portal=True,
                     mail_create_nosubscribe=True,
+                    website_appointment_booking_notes=True,
                 ).create(
                     {
                         "type_id": booking_type.id,
@@ -323,6 +359,7 @@ class WebsiteAppointmentBooking(http.Controller):
                         # The organizer defaults to the current (public) user.
                         # Set it once the combination is known, see below.
                         "user_id": False,
+                        "description": plaintext2html(notes) if notes else False,
                     }
                 )
                 booking.start = when_naive

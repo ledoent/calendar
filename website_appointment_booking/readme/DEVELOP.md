@@ -12,6 +12,12 @@ computation of `resource_booking` instead of duplicating it.
   never overwritten afterwards, and normalised with the platform `slugify` on
   create/write so a hand-typed value is URL-safe. It is unique (SQL constraint) and
   mandatory to publish (Python constraint).
+- `resource.booking._prepare_meeting_vals`: under the context key
+  `website_appointment_booking_notes`, set by the confirm route, the meeting
+  description is the type's advice followed by the booking's description (the
+  visitor's notes, escaped with `plaintext2html`). Other bookings keep the advice
+  only, since their description may hold internal text. A meeting created again
+  later, from the back office, has the advice only.
 
 ## Controller
 
@@ -51,8 +57,10 @@ Invariants:
   values; overrides add keys. `padded_slots` (tz-aware slots with one day of padding) is
   exposed for them.
 - `_get_error_message(code)`: extend the code → message map.
-- `_check_submission(kwargs, action)`, `_get_or_create_partner(name, email)`: reusable
-  by other public forms of the page.
+- `_check_submission(kwargs, action)`,
+  `_get_or_create_partner(name, email, company=None, phone=None)` and
+  `_get_optional_contact_values(kwargs)` (the trimmed `company` and `phone` inputs):
+  reusable by other public forms of the page.
 - Template anchors: `.o_wab_alerts_row` (error alert) and `.o_wab_calendar_row`
   (calendar block) for `xpath` insertions; `booking_form_guard` for the hidden fields
   any new form must include.

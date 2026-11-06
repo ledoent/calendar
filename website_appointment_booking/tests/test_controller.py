@@ -263,6 +263,128 @@ class TestWebsiteAppointmentBooking(HttpCase):
         self.assertEqual(len(partners), 1)
         self.assertEqual(partners.name, "Existing User")
 
+    def test_booking_form_has_optional_company_and_phone(self):
+        """The form asks for company and phone without requiring them."""
+        page = self._url_xml("/book/test-booking/2021/3")
+        for name in ("company", "phone"):
+            inputs = page.cssselect(f"#o_wab_form input[name='{name}']")
+            self.assertTrue(inputs)
+            self.assertIsNone(inputs[0].get("required"))
+
+    def test_booking_form_has_optional_notes(self):
+        """The form asks for the purpose of the meeting without requiring it."""
+        page = self._url_xml("/book/test-booking/2021/3")
+        notes = page.cssselect("#o_wab_form textarea[name='notes']")
+        self.assertTrue(notes)
+        self.assertIsNone(notes[0].get("required"))
+
+    def test_confirm_notes_reach_booking_and_meeting(self):
+        """The notes go to the booking and, after the type's advice, to the
+        meeting its invitation is sent from."""
+        self.rbt.requester_advice = "Bring your questions"
+        self._confirm(
+            {
+                "name": "Test Visitor",
+                "email": "visitor@example.com",
+                "notes": "Migration from Odoo 16",
+                "when": "2021-03-01T10:00:00+00:00",
+            }
+        )
+        booking = self._booking_for("visitor@example.com")
+        self.assertIn("Migration from Odoo 16", booking.description)
+        description = booking.meeting_id.description
+        self.assertIn("Bring your questions", description)
+        self.assertIn("Migration from Odoo 16", description)
+        self.assertLess(
+            description.index("Bring your questions"),
+            description.index("Migration from Odoo 16"),
+        )
+
+    def test_confirm_notes_are_escaped(self):
+        """Markup typed by a visitor is shown as text, not rendered."""
+        self._confirm(
+            {
+                "name": "Test Visitor",
+                "email": "visitor@example.com",
+                "notes": "<b>bold</b> <script>alert(1)</script>",
+                "when": "2021-03-01T10:00:00+00:00",
+            }
+        )
+        booking = self._booking_for("visitor@example.com")
+        for html in (booking.description, booking.meeting_id.description):
+            self.assertNotIn("<script", html)
+            self.assertNotIn("<b>", html)
+            self.assertIn("&lt;b&gt;bold&lt;/b&gt;", html)
+
+    def test_confirm_without_notes_keeps_the_advice(self):
+        """Without notes the meeting description is the type's advice."""
+        self.rbt.requester_advice = "Bring your questions"
+        self._confirm(
+            {
+                "name": "Test Visitor",
+                "email": "visitor@example.com",
+                "when": "2021-03-01T10:00:00+00:00",
+            }
+        )
+        booking = self._booking_for("visitor@example.com")
+        self.assertFalse(booking.description)
+        self.assertIn("Bring your questions", booking.meeting_id.description)
+
+    def test_confirm_stores_company_and_phone(self):
+        """A new contact gets the company name and phone given."""
+        self._confirm(
+            {
+                "name": "Test Visitor",
+                "email": "visitor@example.com",
+                "company": "  Visitor Inc  ",
+                "phone": "+34 600 000 000",
+                "when": "2021-03-01T10:00:00+00:00",
+            }
+        )
+        partner = self._booking_for("visitor@example.com").partner_id
+        self.assertEqual(partner.company_name, "Visitor Inc")
+        self.assertEqual(partner.phone, "+34 600 000 000")
+        self.assertFalse(partner.parent_id, "no company record is created")
+
+    def test_existing_partner_keeps_company_and_phone(self):
+        """A contact's company name and phone are only filled when empty."""
+        partner = self.env["res.partner"].create(
+            {
+                "name": "Existing User",
+                "email": "existing@example.com",
+                "company_name": "Existing Inc",
+                "phone": "+1 555 0100",
+            }
+        )
+        self._confirm(
+            {
+                "name": "Existing User",
+                "email": "existing@example.com",
+                "company": "Other Inc",
+                "phone": "+1 555 0199",
+                "when": "2021-03-01T10:00:00+00:00",
+            }
+        )
+        self.assertEqual(partner.company_name, "Existing Inc")
+        self.assertEqual(partner.phone, "+1 555 0100")
+
+    def test_existing_partner_gets_missing_company_and_phone(self):
+        """A contact without company name or phone gets the ones given."""
+        partner = self.env["res.partner"].create(
+            {"name": "Existing User", "email": "existing@example.com"}
+        )
+        self._confirm(
+            {
+                "name": "Existing User",
+                "email": "existing@example.com",
+                "company": "Existing Inc",
+                "phone": "+1 555 0100",
+                "when": "2021-03-01T10:00:00+00:00",
+            }
+        )
+        self.assertEqual(partner.company_name, "Existing Inc")
+        self.assertEqual(partner.phone, "+1 555 0100")
+
     def test_website_description_displayed(self):
         """Website description is shown on the booking page."""
         self.rbt.website_description = "<p>Welcome to our booking page!</p>"
