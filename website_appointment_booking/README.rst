@@ -1,3 +1,7 @@
+.. image:: https://odoo-community.org/readme-banner-image
+   :target: https://odoo-community.org/get-involved?utm_source=readme
+   :alt: Odoo Community Association
+
 ===========================
 Website Appointment Booking
 ===========================
@@ -13,17 +17,17 @@ Website Appointment Booking
 .. |badge1| image:: https://img.shields.io/badge/maturity-Beta-yellow.png
     :target: https://odoo-community.org/page/development-status
     :alt: Beta
-.. |badge2| image:: https://img.shields.io/badge/licence-AGPL--3-blue.png
+.. |badge2| image:: https://img.shields.io/badge/license-AGPL--3-blue.png
     :target: http://www.gnu.org/licenses/agpl-3.0-standalone.html
     :alt: License: AGPL-3
 .. |badge3| image:: https://img.shields.io/badge/github-OCA%2Fcalendar-lightgray.png?logo=github
-    :target: https://github.com/OCA/calendar/tree/18.0/website_appointment_booking
+    :target: https://github.com/OCA/calendar/tree/19.0/website_appointment_booking
     :alt: OCA/calendar
 .. |badge4| image:: https://img.shields.io/badge/weblate-Translate%20me-F47D42.png
-    :target: https://translation.odoo-community.org/projects/calendar-18-0/calendar-18-0-website_appointment_booking
+    :target: https://translation.odoo-community.org/projects/calendar-19-0/calendar-19-0-website_appointment_booking
     :alt: Translate me on Weblate
 .. |badge5| image:: https://img.shields.io/badge/runboat-Try%20me-875A7B.png
-    :target: https://runboat.odoo-community.org/builds?repo=OCA/calendar&target_branch=18.0
+    :target: https://runboat.odoo-community.org/builds?repo=OCA/calendar&target_branch=19.0
     :alt: Try me on Runboat
 
 |badge1| |badge2| |badge3| |badge4| |badge5|
@@ -104,8 +108,22 @@ Once a booking type is published:
    website.
 2. Visitors see a monthly calendar with available days highlighted, in
    their own timezone; a dropdown lets them display another one.
+   ``/book/<slug>`` opens on the first month that has availability
+   rather than on the current month, so a booking type whose slots start
+   later — an event, or a resource booked solid for several weeks — does
+   not greet visitors with an empty grid and leave them guessing how far
+   forward to click. The search looks up to twelve months ahead; if
+   nothing is found in that window the current month is shown with its
+   empty state. A URL that names a month explicitly, such as
+   ``/book/<slug>/2026/10``, is always honoured as given, so the
+   previous/next arrows and the browser's back button behave normally.
 3. Clicking a day reveals the available time slots for that day.
-4. Clicking a time slot shows a simple form asking for name and email.
+4. Clicking a time slot shows a simple form asking for name and email,
+   and optionally company and phone. They are saved on the visitor's
+   contact; an existing contact only gets the ones it lacks. The visitor
+   can also say what they want to discuss: the text is kept as the
+   booking's description and added to the meeting description, after the
+   type's advice.
 5. Upon confirmation, a ``resource.booking`` record is created and
    confirmed automatically, and calendar invitations are sent to both
    parties. The meeting organizer is the assigned resource's user.
@@ -135,6 +153,13 @@ Model
   the platform ``slugify`` on create/write so a hand-typed value is
   URL-safe. It is unique (SQL constraint) and mandatory to publish
   (Python constraint).
+- ``resource.booking._prepare_meeting_vals``: under the context key
+  ``website_appointment_booking_notes``, set by the confirm route, the
+  meeting description is the type's advice followed by the booking's
+  description (the visitor's notes, escaped with ``plaintext2html``).
+  Other bookings keep the advice only, since their description may hold
+  internal text. A meeting created again later, from the back office,
+  has the advice only.
 
 Controller
 ----------
@@ -182,8 +207,9 @@ Extension points
   (tz-aware slots with one day of padding) is exposed for them.
 - ``_get_error_message(code)``: extend the code → message map.
 - ``_check_submission(kwargs, action)``,
-  ``_get_or_create_partner(name, email)``: reusable by other public
-  forms of the page.
+  ``_get_or_create_partner(name, email, company=None, phone=None)`` and
+  ``_get_optional_contact_values(kwargs)`` (the trimmed ``company`` and
+  ``phone`` inputs): reusable by other public forms of the page.
 - Template anchors: ``.o_wab_alerts_row`` (error alert) and
   ``.o_wab_calendar_row`` (calendar block) for ``xpath`` insertions;
   ``booking_form_guard`` for the hidden fields any new form must
@@ -202,7 +228,7 @@ Bug Tracker
 Bugs are tracked on `GitHub Issues <https://github.com/OCA/calendar/issues>`_.
 In case of trouble, please check there if your issue has already been reported.
 If you spotted it first, help us to smash it by providing a detailed and welcomed
-`feedback <https://github.com/OCA/calendar/issues/new?body=module:%20website_appointment_booking%0Aversion:%2018.0%0A%0A**Steps%20to%20reproduce**%0A-%20...%0A%0A**Current%20behavior**%0A%0A**Expected%20behavior**>`_.
+`feedback <https://github.com/OCA/calendar/issues/new?body=module:%20website_appointment_booking%0Aversion:%2019.0%0A%0A**Steps%20to%20reproduce**%0A-%20...%0A%0A**Current%20behavior**%0A%0A**Expected%20behavior**>`_.
 
 Do not contact contributors directly about support or help with technical issues.
 
@@ -247,6 +273,6 @@ Current `maintainer <https://odoo-community.org/page/maintainer-role>`__:
 
 |maintainer-dnplkndll| 
 
-This module is part of the `OCA/calendar <https://github.com/OCA/calendar/tree/18.0/website_appointment_booking>`_ project on GitHub.
+This module is part of the `OCA/calendar <https://github.com/OCA/calendar/tree/19.0/website_appointment_booking>`_ project on GitHub.
 
 You are welcome to contribute. To learn how please visit https://odoo-community.org/page/Contribute.
