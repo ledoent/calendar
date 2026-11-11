@@ -76,6 +76,12 @@ class TestResourceBookingTypeWebsite(TransactionCase):
         self.assertEqual(self.rbt.website_url, "/book/consult")
 
     def test_slug_special_characters(self):
-        """Slug strips special characters and accents."""
+        """Slug strips punctuation but keeps letters, accents included.
+
+        Accents survive on 20.0, where 18.0 transliterated them away:
+        ``ir.http._slugify_one`` calls python-slugify with
+        ``allow_unicode=True``, and its fallback keeps every word character,
+        which accented letters are. The slug stays URL-safe either way.
+        """
         rbt = self._new_type("Réunion (30 min) & Café!")
-        self.assertEqual(rbt.website_slug, "reunion-30-min-cafe")
+        self.assertEqual(rbt.website_slug, "réunion-30-min-café")
