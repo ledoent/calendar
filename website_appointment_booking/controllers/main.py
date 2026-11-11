@@ -118,12 +118,21 @@ class WebsiteAppointmentBooking(http.Controller):
         """Anti-abuse gate for the public POST routes.
 
         Returns an error code, or None when the submission may proceed.
-        The honeypot always applies; reCAPTCHA v3 applies when the website
-        has a site key configured (``ir.http`` returns True otherwise).
+        The honeypot always applies; reCAPTCHA v3 applies when it is enabled
+        and a site key is configured.
+
+        ``_verify_request_recaptcha_token`` returns None and signals a refusal
+        by raising, so the result must not be tested for truth: since 19.0 the
+        base ``ir.http`` stub returns None too, and ``if not ...`` would reject
+        every submission, reCAPTCHA installed or not. Catching ``UserError``
+        follows core's own callers (``website_mass_mailing.subscribe``) and
+        covers ``ValidationError``, which subclasses it.
         """
         if (kwargs.get(HONEYPOT_FIELD) or "").strip():
             return "rejected"
-        if not request.env["ir.http"]._verify_request_recaptcha_token(action):
+        try:
+            request.env["ir.http"]._verify_request_recaptcha_token(action)
+        except UserError:
             return "rejected"
         return None
 
