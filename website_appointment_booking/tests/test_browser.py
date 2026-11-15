@@ -48,6 +48,8 @@ class TestBookingInteractions(HttpCase):
                     throw new Error('Expected an available booking day');
                 }
                 day.click();
+                // Colibri binds the newly rendered slot buttons after the handler.
+                await new Promise((resolve) => requestAnimationFrame(resolve));
                 const slot = document.querySelector('.o_wab_slot_btn');
                 if (!slot) {
                     throw new Error('Selecting a day must display time slots');
