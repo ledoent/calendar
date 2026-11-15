@@ -65,6 +65,9 @@ export class WebsiteAppointmentDescription extends Interaction {
 
     setup() {
         this.details = this.el.querySelectorAll("details");
+    }
+
+    start() {
         this.addListener(this.details, "toggle", (ev) => this.onToggle(ev));
     }
 
